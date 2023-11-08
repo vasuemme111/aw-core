@@ -10,7 +10,7 @@ from typing import (
 
 from aw_core.models import Event
 
-from .storages import AbstractStorage
+from .storages import AbstractStorage, peewee
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +134,9 @@ class Bucket:
         If several events are inserted, returns None. (This is due to there being no efficient way of getting ids out when doing bulk inserts with some datastores such as peewee/SQLite)
         """
 
+        # events.data = peewee.decrypt(events.data)
         # NOTE: Should we keep the timestamp checking?
         warn_older_event = False
-
         # Get last event for timestamp check after insert
         if warn_older_event:
             last_event_list = self.get(1)
@@ -160,6 +160,7 @@ class Bucket:
             inserted = self.ds.storage_strategy.insert_one(self.bucket_id, events)
             # assert inserted
         elif isinstance(events, list):
+            events.data = peewee.decrypt(events.data)
             if events:
                 oldest_event = sorted(events, key=lambda k: k["timestamp"])[0]
             else:  # pragma: no cover

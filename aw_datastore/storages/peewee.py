@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
@@ -8,12 +9,16 @@ from typing import (
     List,
     Optional,
 )
-
+if sys.platform == "win32":
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    activitywatch_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+    os.add_dll_directory(activitywatch_dir)
+    
 import iso8601
 from aw_core.dirs import get_data_dir
 from aw_core.models import Event
 from playhouse.migrate import SqliteMigrator, migrate
-from playhouse.sqlite_ext import SqliteExtDatabase
+from playhouse.sqlcipher_ext import SqlCipherDatabase
 
 import peewee
 from peewee import (
@@ -27,6 +32,10 @@ from peewee import (
 )
 
 from .abstract import AbstractStorage
+from cryptography.fernet import Fernet
+import cryptocode
+import keyring
+
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +47,43 @@ peewee_logger.setLevel(logging.INFO)
 #   See: http://docs.peewee-orm.com/en/latest/peewee/database.html#run-time-database-configuration
 # Another option would be to use peewee's Proxy.
 #   See: http://docs.peewee-orm.com/en/latest/peewee/database.html#dynamic-db
-_db = SqliteExtDatabase(None)
+_db = SqlCipherDatabase(None,passphrase="dholu11@")
 
 
 LATEST_VERSION = 2
 
+salt = "T<3zb=+:Iv!HJcimW=k5"
+
+def generate_encryption_key() -> bytes:
+    """Generate a new encryption key."""
+    return Fernet.generate_key()
+
+def get_key():
+    key = keyring.get_password("PeeweeStorage", "encryption_key")
+    if key is None:
+        key = generate_encryption_key()
+        keyring.set_password("PeeweeStorage", "encryption_key", cryptocode.encrypt(key.decode(), salt))
+    return key
+
+def encrypt(data: str) -> str:
+    """Encrypt the given data using Fernet symmetric encryption."""
+    key = cryptocode.decrypt(get_key(), salt)
+    f = Fernet(key)
+    encrypted_data = f.encrypt(data.encode())
+    return encrypted_data.decode()
+
+
+def decrypt(encrypted_data: str) -> str:
+    """Decrypt the encrypted data using Fernet symmetric encryption."""
+    key = cryptocode.decrypt(get_key(), salt)
+    f = Fernet(key)
+    data = f.decrypt(encrypted_data.encode())
+    return json.loads(data.decode())
+
+
 
 def auto_migrate(path: str) -> None:
-    db = SqliteExtDatabase(path)
+    db = SqlCipherDatabase(path,passphrase="dholu11@")
     migrator = SqliteMigrator(db)
 
     # check if bucketmodel has datastr field
@@ -119,7 +157,7 @@ class EventModel(BaseModel):
             id=event.id,
             timestamp=event.timestamp,
             duration=event.duration.total_seconds(),
-            datastr=json.dumps(event.data),
+            datastr=encrypt(json.dumps(event.data)),
         )
 
     def json(self):
@@ -127,7 +165,7 @@ class EventModel(BaseModel):
             "id": self.id,
             "timestamp": self.timestamp,
             "duration": float(self.duration),
-            "data": json.loads(self.datastr),
+            "data": decrypt(self.datastr),
         }
 
 
@@ -240,6 +278,8 @@ class PeeweeStorage(AbstractStorage):
 
     def insert_one(self, bucket_id: str, event: Event) -> Event:
         e = EventModel.from_event(self.bucket_keys[bucket_id], event)
+        data_str = json.dumps(event.data)
+        event.data = encrypt(data_str)
         e.save()
         event.id = e.id
         return event
