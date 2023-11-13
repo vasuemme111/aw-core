@@ -10,10 +10,9 @@ from typing import (
     Optional,
 )
 if sys.platform == "win32":
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    activitywatch_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-    os.add_dll_directory(activitywatch_dir)
-    
+    dll_path = os.getenv('Activitywatch')
+    os.add_dll_directory(dll_path)
+
 import iso8601
 from aw_core.dirs import get_data_dir
 from aw_core.models import Event
