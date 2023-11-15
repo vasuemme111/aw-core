@@ -13,6 +13,8 @@ if sys.platform == "win32":
     dll_path = os.getenv('Activitywatch')
     os.add_dll_directory(dll_path)
 
+from aw_core.util import decrypt_uuid, load_key
+import keyring
 import iso8601
 from aw_core.dirs import get_data_dir
 from aw_core.models import Event
@@ -28,13 +30,13 @@ from peewee import (
     ForeignKeyField,
     IntegerField,
     Model,
+    DatabaseProxy,
 )
 
 from .abstract import AbstractStorage
 from cryptography.fernet import Fernet
 import cryptocode
 import keyring
-
 
 logger = logging.getLogger(__name__)
 
@@ -46,43 +48,15 @@ peewee_logger.setLevel(logging.INFO)
 #   See: http://docs.peewee-orm.com/en/latest/peewee/database.html#run-time-database-configuration
 # Another option would be to use peewee's Proxy.
 #   See: http://docs.peewee-orm.com/en/latest/peewee/database.html#dynamic-db
-_db = SqlCipherDatabase(None,passphrase="dholu11@")
+db_proxy = DatabaseProxy()
+_db=None
 
 
 LATEST_VERSION = 2
 
-salt = "T<3zb=+:Iv!HJcimW=k5"
-
-def generate_encryption_key() -> bytes:
-    """Generate a new encryption key."""
-    return Fernet.generate_key()
-
-def get_key():
-    key = keyring.get_password("PeeweeStorage", "encryption_key")
-    if key is None:
-        key = generate_encryption_key()
-        keyring.set_password("PeeweeStorage", "encryption_key", cryptocode.encrypt(key.decode(), salt))
-    return key
-
-def encrypt(data: str) -> str:
-    """Encrypt the given data using Fernet symmetric encryption."""
-    key = cryptocode.decrypt(get_key(), salt)
-    f = Fernet(key)
-    encrypted_data = f.encrypt(data.encode())
-    return encrypted_data.decode()
-
-
-def decrypt(encrypted_data: str) -> str:
-    """Decrypt the encrypted data using Fernet symmetric encryption."""
-    key = cryptocode.decrypt(get_key(), salt)
-    f = Fernet(key)
-    data = f.decrypt(encrypted_data.encode())
-    return json.loads(data.decode())
-
-
-
-def auto_migrate(path: str) -> None:
-    db = SqlCipherDatabase(path,passphrase="dholu11@")
+def auto_migrate(db: Any, path: str) -> None:
+    db.init(path)
+    db.connect()
     migrator = SqliteMigrator(db)
 
     # check if bucketmodel has datastr field
@@ -114,8 +88,9 @@ def dt_plus_duration(dt, duration):
 
 
 class BaseModel(Model):
+
     class Meta:
-        database = _db
+        database=db_proxy
 
 
 class BucketModel(BaseModel):
@@ -156,7 +131,7 @@ class EventModel(BaseModel):
             id=event.id,
             timestamp=event.timestamp,
             duration=event.duration.total_seconds(),
-            datastr=encrypt(json.dumps(event.data)),
+            datastr=json.dumps(event.data),
         )
 
     def json(self):
@@ -164,7 +139,7 @@ class EventModel(BaseModel):
             "id": self.id,
             "timestamp": self.timestamp,
             "duration": float(self.duration),
-            "data": decrypt(self.datastr),
+            "data": json.loads(self.datastr),
         }
 
 
@@ -172,32 +147,47 @@ class PeeweeStorage(AbstractStorage):
     sid = "peewee"
 
     def __init__(self, testing: bool = True, filepath: Optional[str] = None) -> None:
-        data_dir = get_data_dir("aw-server")
+        self.init_db()
 
-        if not filepath:
-            filename = (
-                "peewee-sqlite"
-                + ("-testing" if testing else "")
-                + f".v{LATEST_VERSION}"
-                + ".db"
-            )
-            filepath = os.path.join(data_dir, filename)
-        self.db = _db
-        self.db.init(filepath)
-        logger.info(f"Using database file: {filepath}")
-        self.db.connect()
+    def init_db(self, testing: bool = True, filepath: Optional[str] = None) -> bool:
+        db_key = keyring.get_password("aw_db", "aw_db")
+        key = load_key("aw_user", "aw_user")
+        if not db_key or not key:
+            logger.info("User account not exist")
+            return False
+        else:
+            password = decrypt_uuid(db_key, key)
+            if not password:
+                return False
+            data_dir = get_data_dir("aw-server")
 
-        self.bucket_keys: Dict[str, int] = {}
-        BucketModel.create_table(safe=True)
-        EventModel.create_table(safe=True)
+            if not filepath:
+                filename = (
+                    "peewee-sqlite"
+                    + ("-testing" if testing else "")
+                    + f".v{LATEST_VERSION}"
+                    + ".db"
+                )
+                filepath = os.path.join(data_dir, filename)
+            _db = SqlCipherDatabase(None,passphrase=password)
+            db_proxy.initialize(_db)
+            self.db = _db
+            self.db.init(filepath)
+            logger.info(f"Using database file: {filepath}")
+            self.db.connect()
 
-        # Migrate database if needed, requires closing the connection first
-        self.db.close()
-        auto_migrate(filepath)
-        self.db.connect()
+            BucketModel.create_table(safe=True)
+            EventModel.create_table(safe=True)
 
-        # Update bucket keys
-        self.update_bucket_keys()
+            # Migrate database if needed, requires closing the connection first
+            self.db.close()
+            auto_migrate(_db,filepath)
+            self.db.connect()
+
+            # Update bucket keys
+            self.update_bucket_keys()
+
+            return True
 
     def update_bucket_keys(self) -> None:
         buckets = BucketModel.select()
@@ -277,8 +267,6 @@ class PeeweeStorage(AbstractStorage):
 
     def insert_one(self, bucket_id: str, event: Event) -> Event:
         e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-        data_str = json.dumps(event.data)
-        event.data = encrypt(data_str)
         e.save()
         event.id = e.id
         return event
