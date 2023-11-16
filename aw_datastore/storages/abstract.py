@@ -16,6 +16,10 @@ class AbstractStorage(metaclass=ABCMeta):
     def __init__(self, testing: bool) -> None:
         self.testing = True
         raise NotImplementedError
+    
+    @abstractmethod
+    def init_db(self) -> bool:
+        raise NotImplementedError
 
     @abstractmethod
     def buckets(self) -> Dict[str, dict]:

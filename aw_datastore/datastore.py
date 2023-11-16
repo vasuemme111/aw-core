@@ -31,6 +31,9 @@ class Datastore:
         return "<Datastore object using {}>".format(
             self.storage_strategy.__class__.__name__
         )
+    
+    def init_db(self) -> bool:
+        return self.storage_strategy.init_db()
 
     def __getitem__(self, bucket_id: str) -> "Bucket":
         # If this bucket doesn't have a initialized object, create it

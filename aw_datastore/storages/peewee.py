@@ -150,8 +150,8 @@ class PeeweeStorage(AbstractStorage):
         self.init_db()
 
     def init_db(self, testing: bool = True, filepath: Optional[str] = None) -> bool:
-        db_key = keyring.get_password("aw_db", "aw_db")
-        key = load_key("aw_user", "aw_user")
+        db_key = keyring.get_password("sdcdb", "sdcdb")
+        key = load_key("sdcu", "sdcu")
         if not db_key or not key:
             logger.info("User account not exist")
             data_dir = get_data_dir("aw-server")
