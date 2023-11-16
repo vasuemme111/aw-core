@@ -1,11 +1,11 @@
 import base64
 import ctypes
-import os
 import sys
 from typing import Tuple
 import logging
 from cryptography.fernet import Fernet
 import keyring
+import pam
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,12 @@ def decrypt_uuid(encrypted_uuid, key):
         return None
 
 def authenticate(username, password):
+    if sys.platform != "darwin":
+        return authenticateWindows(username=username, password=password)
+    else:
+        return authenticateMac(username=username, password=password)
+
+def authenticateWindows(username, password):
     try:
         handle = ctypes.windll.advapi32.LogonUserW(
             username,
@@ -84,6 +90,17 @@ def authenticate(username, password):
         else:
             return False
     except Exception as e:
+        print(f"Authentication error: {e}")
+        return False
+    
+def authenticateMac(username, password):
+    try:
+        # Attempt to authenticate the user with the provided username and password
+        if pam.authenticate(username, password):
+            return True
+        else:
+            return False
+    except pam.PAMError as e:
         print(f"Authentication error: {e}")
         return False
 

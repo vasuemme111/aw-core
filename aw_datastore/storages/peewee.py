@@ -154,6 +154,21 @@ class PeeweeStorage(AbstractStorage):
         key = load_key("aw_user", "aw_user")
         if not db_key or not key:
             logger.info("User account not exist")
+            data_dir = get_data_dir("aw-server")
+ 
+            if not filepath:
+                filename = (
+                    "peewee-sqlite"
+                    + ("-testing" if testing else "")
+                    + f".v{LATEST_VERSION}"
+                    + ".db"
+                )
+                filepath = os.path.join(data_dir, filename)
+            try:
+                os.remove(filepath)
+            except Exception:
+                pass
+ 
             return False
         else:
             password = decrypt_uuid(db_key, key)
