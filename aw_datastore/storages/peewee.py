@@ -172,14 +172,16 @@ class PeeweeStorage(AbstractStorage):
             return False
         else:
             password = decrypt_uuid(db_key, key)
+            user_email = keyring.get_password("sdce", "sdce")
             if not password:
                 return False
             data_dir = get_data_dir("aw-server")
-
+ 
             if not filepath:
                 filename = (
                     "peewee-sqlite"
                     + ("-testing" if testing else "")
+                    + f"-{user_email}"
                     + f".v{LATEST_VERSION}"
                     + ".db"
                 )
