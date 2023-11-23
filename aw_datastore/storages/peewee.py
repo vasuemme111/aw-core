@@ -10,8 +10,9 @@ from typing import (
     Optional,
 )
 if sys.platform == "win32":
-    dll_path = os.getenv('Activitywatch')
-    os.add_dll_directory(dll_path)
+    _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+    print(_module_dir)
+    os.add_dll_directory(_module_dir)
 
 from aw_core.util import decrypt_uuid, load_key
 import keyring
