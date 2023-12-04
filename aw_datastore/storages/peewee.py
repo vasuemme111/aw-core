@@ -9,10 +9,17 @@ from typing import (
     List,
     Optional,
 )
+import ctypes
 if sys.platform == "win32":
     _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-    print(_module_dir)
     os.add_dll_directory(_module_dir)
+elif sys.platform == "darwin":
+    _module_dir = os.path.dirname(os.path.realpath(__file__))
+    _parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(os.path.join(_module_dir, os.pardir))))
+    libsqlcipher_path = _parent_dir
+    print(libsqlcipher_path)
+    libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
+    openssl= ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
 
 from aw_core.util import decrypt_uuid, load_key
 import keyring
