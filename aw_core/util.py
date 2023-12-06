@@ -2,6 +2,7 @@ import base64
 import ctypes
 import sys
 from typing import Tuple
+from aw_core.cache import *
 import logging
 from cryptography.fernet import Fernet
 import keyring
@@ -35,12 +36,14 @@ def generate_key(service_name, user_name):
     keyring.set_password(service_name, user_name, key_string)
 
 # Load the secret key from a file
-def load_key(service_name, user_name):
-    # key_string = keyring.get_password(service_name, user_name)
-    # if not key_string:
-    #     return None
-    # return base64.urlsafe_b64decode(key_string.encode('utf-8'))
-    return keyring.get_password(service_name, user_name)
+def load_key(service_name):
+    cache_key = "current_user_credentials"
+    cached_credentials = cache_user_credentials(cache_key)
+    if cached_credentials != None:
+        return cached_credentials.get(service_name)
+    else:
+        return None
+    
 
 def str_to_fernet(key):
     return base64.urlsafe_b64decode(key.encode('utf-8'))
@@ -106,9 +109,9 @@ def authenticateMac(username, password):
 
 def reset_user():
     try:
-        keyring.delete_password("sdcu", "sdcu")
-        keyring.delete_password("sdcdb", "sdcdb")
-        keyring.delete_password("sdcdt", "sdcdt")
+        keyring.delete_password("SD_KEYS", "SD_KEYS")
+        cache_key = "current_user_credentials"
+        clear_credentials(cache_key)
     except Exception as e:
         print(f"Authentication error: {e}")
 

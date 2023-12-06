@@ -10,6 +10,7 @@ from typing import (
     Optional,
 )
 import ctypes
+from aw_core.cache import cache_user_credentials
 if sys.platform == "win32":
     _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
     os.add_dll_directory(_module_dir)
@@ -158,9 +159,15 @@ class PeeweeStorage(AbstractStorage):
         self.init_db()
 
     def init_db(self, testing: bool = True, filepath: Optional[str] = None) -> bool:
-        db_key = keyring.get_password("sdcdb", "sdcdb")
-        key = load_key("sdcu", "sdcu")
-        if not db_key or not key:
+        db_key = ""
+        cache_key = "current_user_credentials"
+        cached_credentials = cache_user_credentials(cache_key)
+        if cached_credentials != None:
+            db_key = cached_credentials.get("encrypted_db_key")
+        else:
+            db_key == None
+        key = load_key('user_key')
+        if db_key == None or key == None:
             logger.info("User account not exist")
             data_dir = get_data_dir("aw-server")
  
@@ -180,7 +187,7 @@ class PeeweeStorage(AbstractStorage):
             return False
         else:
             password = decrypt_uuid(db_key, key)
-            user_email = keyring.get_password("sdce", "sdce")
+            user_email = cached_credentials.get("email")
             if not password:
                 return False
             data_dir = get_data_dir("aw-server")
