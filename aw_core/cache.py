@@ -26,15 +26,8 @@ def cache_user_credentials(cache_key):
         SD_KEYS = keyring.get_password("SD_KEYS", "SD_KEYS")
         if SD_KEYS:
             # Parse the JSON stored in SD_KEYS
-            SD_KEYS = json.loads(SD_KEYS)
+            SD_KEYS = json.loads(SD_KEYS.replace("'","\""))
             store_credentials(cache_key, SD_KEYS)
             return SD_KEYS  # Return the newly cached credentials
 
     return cached_credentials  # Return the cached or newly cached credentials
-
-# Example usage:
-user_key = cache_user_credentials("user_key")
-if user_key:
-    print("User Key:", user_key)
-else:
-    print("User Key not found or could not be cached.")
