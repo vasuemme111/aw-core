@@ -52,6 +52,11 @@ class Datastore:
 
         return self.bucket_instances[bucket_id]
 
+    def save_settings(self, settings_id, settings_dict) -> None:
+        self.storage_strategy.save_settings(settings_id, settings_dict)
+
+    def retrieve_settings(self, settings_id) -> dict:
+        return self.storage_strategy.retrieve_settings(settings_id)
     def create_bucket(
         self,
         bucket_id: str,

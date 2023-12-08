@@ -151,6 +151,33 @@ class EventModel(BaseModel):
             "data": json.loads(self.datastr),
         }
 
+class SettingsModel(BaseModel):
+    id = AutoField()
+    settings = CharField()
+
+    @classmethod
+    def from_settings(cls, settings_id, settings_dict):
+        """
+        Create a SettingsModel instance from settings dictionary.
+        :param settings_id: The ID for the settings.
+        :param settings_dict: A dictionary containing the settings.
+        :return: A SettingsModel instance.
+        """
+        return cls(
+            id=settings_id,
+            settings=json.dumps(settings_dict)
+        )
+
+    def json(self):
+        """
+        Convert the model instance to a JSON-compatible dictionary.
+        :return: A dictionary representation of the settings.
+        """
+        return {
+            "id": self.id,
+            "settings": json.loads(self.settings)
+        }
+
 
 class PeeweeStorage(AbstractStorage):
     sid = "peewee"
@@ -210,6 +237,7 @@ class PeeweeStorage(AbstractStorage):
 
             BucketModel.create_table(safe=True)
             EventModel.create_table(safe=True)
+            SettingsModel.create_table(safe=True)
 
             # Migrate database if needed, requires closing the connection first
             self.db.close()
@@ -472,3 +500,37 @@ class PeeweeStorage(AbstractStorage):
             q = q.where(EventModel.timestamp <= endtime)
 
         return q
+
+    def save_settings(self, settings_id, settings_dict):
+        """
+        Save or update settings in the database.
+        :param settings_id: The unique identifier for the settings.
+        :param settings_dict: A dictionary containing the settings to be saved.
+        :return: The saved settings object.
+        """
+        try:
+            # Check if 'id' is the appropriate field to use here
+            settings, created = SettingsModel.get_or_create(id=settings_id,
+                                                            defaults={'settings': json.dumps(settings_dict)})
+            if not created:
+                settings.settings = json.dumps(settings_dict)
+                settings.save()
+            return settings
+        except peewee.IntegrityError as e:
+            logger.error(f"Integrity error while saving settings: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred while saving settings: {e}")
+            raise
+
+    def retrieve_settings(self, settings_id):
+        """
+        Retrieve settings from the database.
+        :param settings_id: The unique identifier for the settings.
+        :return: A dictionary of the settings if found, otherwise None.
+        """
+        try:
+            settings = SettingsModel.get(SettingsModel.id == settings_id)
+            return json.loads(settings.settings)
+        except SettingsModel.DoesNotExist:
+            return None

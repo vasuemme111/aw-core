@@ -103,3 +103,11 @@ class AbstractStorage(metaclass=ABCMeta):
     @abstractmethod
     def replace_last(self, bucket_id: str, event: Event) -> None:
         raise NotImplementedError
+
+    @abstractmethod
+    def save_settings(self, settings_id, settings_dict) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def retrieve_settings(self, settings_id) -> dict:
+        raise NotImplementedError
