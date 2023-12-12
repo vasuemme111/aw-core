@@ -7,6 +7,8 @@ import logging
 from cryptography.fernet import Fernet
 import keyring
 import pam
+from aw_qt.manager import Manager
+manager = Manager()
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +45,7 @@ def load_key(service_name):
         return cached_credentials.get(service_name)
     else:
         return None
-    
+
 
 def str_to_fernet(key):
     return base64.urlsafe_b64decode(key.encode('utf-8'))
@@ -95,7 +97,7 @@ def authenticateWindows(username, password):
     except Exception as e:
         print(f"Authentication error: {e}")
         return False
-    
+
 def authenticateMac(username, password):
     try:
         # Attempt to authenticate the user with the provided username and password
@@ -112,8 +114,31 @@ def reset_user():
         keyring.delete_password("SD_KEYS", "SD_KEYS")
         cache_key = "current_user_credentials"
         clear_credentials(cache_key)
+        stop_all_module()
     except Exception as e:
         print(f"Authentication error: {e}")
+
+def list_modules():
+    modules = manager.status()
+    return modules
+
+def start_module(self, module_name):
+    manager.start_modules(module_name)
+
+def stop_module(self, module_name):
+    manager.stop_modules(module_name)
+
+def stop_all_module():
+    modules = list_modules()
+    for module in modules:
+        if module["Watcher_status"]:
+            manager.stop_modules(module["watcher_name"])
+
+def start_all_module():
+    modules = list_modules()
+    for module in modules:
+        if not module["Watcher_status"]:
+            manager.start_modules(module["watcher_name"])
 
 import requests
 
@@ -126,4 +151,5 @@ def is_internet_connected():
     except requests.ConnectionError:
         # If there's a connection error, return False
         return False
+
 

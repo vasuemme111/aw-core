@@ -22,7 +22,7 @@ elif sys.platform == "darwin":
     libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
     openssl= ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
 
-from aw_core.util import decrypt_uuid, load_key
+from aw_core.util import decrypt_uuid, load_key, start_all_module
 import keyring
 import iso8601
 from aw_core.dirs import get_data_dir
@@ -197,7 +197,7 @@ class PeeweeStorage(AbstractStorage):
         if db_key == None or key == None:
             logger.info("User account not exist")
             data_dir = get_data_dir("aw-server")
- 
+
             if not filepath:
                 filename = (
                     "peewee-sqlite"
@@ -210,7 +210,7 @@ class PeeweeStorage(AbstractStorage):
                 os.remove(filepath)
             except Exception:
                 pass
- 
+
             return False
         else:
             password = decrypt_uuid(db_key, key)
@@ -218,7 +218,7 @@ class PeeweeStorage(AbstractStorage):
             if not password:
                 return False
             data_dir = get_data_dir("aw-server")
- 
+
             if not filepath:
                 filename = (
                     "peewee-sqlite"
@@ -246,6 +246,7 @@ class PeeweeStorage(AbstractStorage):
 
             # Update bucket keys
             self.update_bucket_keys()
+            start_all_module()
 
             return True
 
