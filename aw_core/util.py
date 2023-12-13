@@ -131,13 +131,12 @@ def stop_module(self, module_name):
 def stop_all_module():
     modules = list_modules()
     for module in modules:
-        if module["Watcher_status"]:
-            manager.stop_modules(module["watcher_name"])
+        manager.stop_modules(module["watcher_name"])
 
 def start_all_module():
     modules = list_modules()
     for module in modules:
-        if not module["Watcher_status"]:
+        if not module["Watcher_status"] and not module["watcher_name"] == "aw-server":
             manager.start_modules(module["watcher_name"])
 
 import requests
