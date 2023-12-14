@@ -22,7 +22,7 @@ elif sys.platform == "darwin":
     libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
     openssl= ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
 
-from aw_core.util import decrypt_uuid, load_key, start_all_module
+from aw_core.util import decrypt_uuid, load_key, start_all_module, stop_all_module
 import keyring
 import iso8601
 from aw_core.dirs import get_data_dir
@@ -246,6 +246,7 @@ class PeeweeStorage(AbstractStorage):
 
             # Update bucket keys
             self.update_bucket_keys()
+            stop_all_module()
             start_all_module()
 
             return True
