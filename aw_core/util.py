@@ -39,8 +39,8 @@ def generate_key(service_name, user_name):
 
 # Load the secret key from a file
 def load_key(service_name):
-    cache_key = "current_user_credentials"
-    cached_credentials = cache_user_credentials(cache_key)
+    cache_key = "sundial"
+    cached_credentials = cache_user_credentials(cache_key,"SD_KEYS")
     if cached_credentials != None:
         return cached_credentials.get(service_name)
     else:
@@ -111,8 +111,8 @@ def authenticateMac(username, password):
 
 def reset_user():
     try:
-        keyring.delete_password("SD_KEYS", "SD_KEYS")
-        cache_key = "current_user_credentials"
+        delete_password("SD_KEYS")
+        cache_key = "sundial"
         clear_credentials(cache_key)
         stop_all_module()
     except Exception as e:
@@ -131,13 +131,14 @@ def stop_module(self, module_name):
 def stop_all_module():
     modules = list_modules()
     for module in modules:
-        manager.stop_modules(module["watcher_name"])
+        if not module["watcher_name"] == "aw-server":
+            manager.stop_modules(module["watcher_name"])
 
 def start_all_module():
     modules = list_modules()
     for module in modules:
-        if not module["Watcher_status"] and not module["watcher_name"] == "aw-server":
-            manager.start_modules(module["watcher_name"])
+        if not module["watcher_name"] == "aw-server":
+            manager.start(module["watcher_name"])
 
 import requests
 

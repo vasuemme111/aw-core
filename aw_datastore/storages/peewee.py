@@ -187,14 +187,18 @@ class PeeweeStorage(AbstractStorage):
 
     def init_db(self, testing: bool = True, filepath: Optional[str] = None) -> bool:
         db_key = ""
-        cache_key = "current_user_credentials"
-        cached_credentials = cache_user_credentials(cache_key)
-        if cached_credentials != None:
+        cache_key = "sundial"
+        cached_credentials = cache_user_credentials(cache_key, "SD_KEYS")
+        database_changed = False  # Flag to track if the database has been changed
+
+        if cached_credentials is not None:
             db_key = cached_credentials.get("encrypted_db_key")
         else:
-            db_key == None
+            db_key = None
+
         key = load_key('user_key')
-        if db_key == None or key == None:
+
+        if db_key is None or key is None:
             logger.info("User account not exist")
             data_dir = get_data_dir("aw-server")
 
@@ -206,8 +210,10 @@ class PeeweeStorage(AbstractStorage):
                     + ".db"
                 )
                 filepath = os.path.join(data_dir, filename)
+            
             try:
                 os.remove(filepath)
+                database_changed = True
             except Exception:
                 pass
 
@@ -215,8 +221,10 @@ class PeeweeStorage(AbstractStorage):
         else:
             password = decrypt_uuid(db_key, key)
             user_email = cached_credentials.get("email")
+
             if not password:
                 return False
+
             data_dir = get_data_dir("aw-server")
 
             if not filepath:
@@ -228,28 +236,41 @@ class PeeweeStorage(AbstractStorage):
                     + ".db"
                 )
                 filepath = os.path.join(data_dir, filename)
-            _db = SqlCipherDatabase(None,passphrase=password)
+            else:
+                # Check if the database file path has changed
+                if filepath != os.path.join(data_dir, filename):
+                    database_changed = True
+
+            _db = SqlCipherDatabase(None, passphrase=password)
             db_proxy.initialize(_db)
             self.db = _db
             self.db.init(filepath)
             logger.info(f"Using database file: {filepath}")
             self.db.connect()
 
-            BucketModel.create_table(safe=True)
-            EventModel.create_table(safe=True)
-            SettingsModel.create_table(safe=True)
+            try:
+                BucketModel.create_table(safe=True)
+                EventModel.create_table(safe=True)
+                SettingsModel.create_table(safe=True)
+                database_changed = True  # Assume tables creation is a change
+            except Exception:
+                pass  # If tables already exist, it's not a change
 
             # Migrate database if needed, requires closing the connection first
             self.db.close()
-            auto_migrate(_db,filepath)
+            if auto_migrate(_db, filepath):  # Assuming auto_migrate returns True if migration happens
+                database_changed = True
             self.db.connect()
 
             # Update bucket keys
             self.update_bucket_keys()
-            stop_all_module()
+
+            if database_changed:
+                stop_all_module()
             start_all_module()
 
             return True
+
 
     def update_bucket_keys(self) -> None:
         buckets = BucketModel.select()
