@@ -85,6 +85,12 @@ class Datastore:
 
     def buckets(self):
         return self.storage_strategy.buckets()
+    
+    def get_most_used_apps(self, starttime, endtime) -> []:
+        return self.storage_strategy.get_most_used_apps(starttime, endtime)
+    
+    def get_dashboard_events(self, starttime, endtime) -> []:
+        return self.storage_strategy.get_dashboard_events(starttime, endtime)
 
 
 class Bucket:

@@ -19,9 +19,9 @@ elif sys.platform == "darwin":
     _parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(os.path.join(_module_dir, os.pardir))))
     libsqlcipher_path = _parent_dir
     print(libsqlcipher_path)
-    libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
     openssl= ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
-
+    libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
+    
 from aw_core.util import decrypt_uuid, load_key, start_all_module, stop_all_module
 import keyring
 import iso8601
@@ -391,6 +391,80 @@ class PeeweeStorage(AbstractStorage):
             )
         except peewee.DoesNotExist:
             return None
+        
+    def _get_dashboard_events(self, starttime, endtime) -> []:
+ 
+        # Define the raw SQL query with formatting
+        raw_query = f"""
+            SELECT
+                JSON_GROUP_ARRAY(
+                    JSON_OBJECT(
+                        'start', STRFTIME('%Y-%m-%dT%H:%M:%SZ', timestamp),
+                        'end', STRFTIME('%Y-%m-%dT%H:%M:%SZ', DATETIME(timestamp, '+' || duration || ' seconds')),
+                        'event_id', id,
+                        'title', JSON_EXTRACT(datastr, '$.title'),
+                        'duration', duration,
+                        'timestamp', timestamp,
+                        'data', JSON(CAST(datastr AS TEXT)),
+                        'id', id
+                    )
+                ) AS formatted_events
+            FROM
+                eventmodel
+            WHERE
+                timestamp >= '{starttime}'
+                AND timestamp <= '{endtime}'
+                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
+                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
+                AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
+            ORDER BY
+                timestamp ASC;
+        """
+ 
+        # Execute the raw query
+        result = self.db.execute_sql(raw_query)
+ 
+        # Fetch the results
+        rows = result.fetchall()
+ 
+        # Extract the formatted events from the first row
+        formatted_events = json.loads(rows[0][0])
+ 
+        # Print the formatted events
+        return formatted_events
+        
+    def _get_most_used_apps(self, starttime, endtime) -> []:
+        # Define the raw SQL query
+        raw_query = f"""
+            SELECT
+                JSON_EXTRACT(datastr, '$.app') AS app_name,
+                STRFTIME('%H', TIME(STRFTIME('%s', '00:00:00') + SUM(duration), 'unixepoch')) AS total_hours,
+                STRFTIME('%M', TIME(STRFTIME('%s', '00:00:00') + SUM(duration), 'unixepoch')) AS total_minutes,
+                STRFTIME('%S', TIME(STRFTIME('%s', '00:00:00') + SUM(duration), 'unixepoch')) AS total_seconds,
+                SUM(duration) AS total_duration
+            FROM
+                eventmodel
+            WHERE
+                timestamp >= '{starttime}'
+                AND timestamp <= '{endtime}'
+                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
+                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
+                AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
+            GROUP BY
+                app_name;
+        """
+ 
+        # Execute the raw query
+        result = self.db.execute_sql(raw_query)
+ 
+        # Fetch the results
+        rows = result.fetchall()
+ 
+        # Create a list of dictionaries in the desired format
+        formatted_results = [{'app': row[0], 'totalHours': row[1], 'totalMinutes': row[2], 'totalSeconds': row[3], 'totalDuration': row[4]} for row in rows]
+ 
+        # Fetch the results
+        return formatted_results
 
     def _get_last(self, bucket_id) -> EventModel:
         return (
@@ -486,6 +560,20 @@ class PeeweeStorage(AbstractStorage):
                     e.duration = endtime - e.timestamp
 
         return events
+    
+    def get_most_used_apps(
+        self,
+        starttime: Optional[datetime] = None,
+        endtime: Optional[datetime] = None,
+    ) -> []:
+        return self._get_most_used_apps(starttime, endtime)
+    
+    def get_dashboard_events(
+        self,
+        starttime: Optional[datetime] = None,
+        endtime: Optional[datetime] = None,
+    ) -> []:
+        return self._get_dashboard_events(starttime, endtime)
 
     def get_eventcount(
         self,

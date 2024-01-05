@@ -111,3 +111,11 @@ class AbstractStorage(metaclass=ABCMeta):
     @abstractmethod
     def retrieve_settings(self, settings_id) -> dict:
         raise NotImplementedError
+    
+    @abstractmethod
+    def get_most_used_apps(self, starttime, endtime) -> []:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def get_dashboard_events(self, starttime, endtime) -> []:
+        raise NotImplementedError
