@@ -8,6 +8,7 @@ from cryptography.fernet import Fernet
 import keyring
 import pam
 from aw_qt.manager import Manager
+
 manager = Manager()
 
 logger = logging.getLogger(__name__)
@@ -26,21 +27,23 @@ def assert_version(required_version: Tuple[int, ...] = (3, 5)):  # pragma: no co
     if actual_version <= required_version:
         raise VersionException(
             (
-                "Python version {} not supported, you need to upgrade your Python"
-                + " version to at least {}."
+                    "Python version {} not supported, you need to upgrade your Python"
+                    + " version to at least {}."
             ).format(required_version)
         )
     logger.debug(f"Python version: {_version_info_tuple()}")
+
 
 def generate_key(service_name, user_name):
     key = Fernet.generate_key()
     key_string = base64.urlsafe_b64encode(key).decode('utf-8')
     keyring.set_password(service_name, user_name, key_string)
 
+
 # Load the secret key from a file
 def load_key(service_name):
     cache_key = "sundial"
-    cached_credentials = cache_user_credentials(cache_key,"SD_KEYS")
+    cached_credentials = cache_user_credentials(cache_key, "SD_KEYS")
     if cached_credentials != None:
         return cached_credentials.get(service_name)
     else:
@@ -49,6 +52,7 @@ def load_key(service_name):
 
 def str_to_fernet(key):
     return base64.urlsafe_b64decode(key.encode('utf-8'))
+
 
 # Encrypt the UUID
 def encrypt_uuid(uuid_str, key):
@@ -73,11 +77,13 @@ def decrypt_uuid(encrypted_uuid, key):
         print(f"decrypt_uuid error: {e}")
         return None
 
+
 def authenticate(username, password):
     if sys.platform != "darwin":
         return authenticateWindows(username=username, password=password)
     else:
         return authenticateMac(username=username, password=password)
+
 
 def authenticateWindows(username, password):
     try:
@@ -98,6 +104,7 @@ def authenticateWindows(username, password):
         print(f"Authentication error: {e}")
         return False
 
+
 def authenticateMac(username, password):
     try:
         # Attempt to authenticate the user with the provided username and password
@@ -109,6 +116,7 @@ def authenticateMac(username, password):
         print(f"Authentication error: {e}")
         return False
 
+
 def reset_user():
     try:
         delete_password("SD_KEYS")
@@ -118,15 +126,20 @@ def reset_user():
     except Exception as e:
         print(f"Authentication error: {e}")
 
+
 def list_modules():
     modules = manager.status()
+    print(modules)
     return modules
 
-def start_module(self, module_name):
-    manager.start_modules(module_name)
 
-def stop_module(self, module_name):
+def start_module( module_name):
+    manager.start(module_name)
+
+
+def stop_module( module_name):
     manager.stop_modules(module_name)
+
 
 def stop_all_module():
     modules = list_modules()
@@ -134,13 +147,16 @@ def stop_all_module():
         if not module["watcher_name"] == "aw-server":
             manager.stop_modules(module["watcher_name"])
 
+
 def start_all_module():
     modules = list_modules()
     for module in modules:
         if not module["watcher_name"] == "aw-server":
             manager.start(module["watcher_name"])
 
+
 import requests
+
 
 def is_internet_connected():
     try:
@@ -151,5 +167,3 @@ def is_internet_connected():
     except requests.ConnectionError:
         # If there's a connection error, return False
         return False
-
-
