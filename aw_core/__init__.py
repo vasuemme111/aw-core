@@ -1,3 +1,4 @@
+# This is a hack to make it easier to test. We don't want to use it in production
 # ignore: F401
 
 from . import __about__

@@ -9,7 +9,16 @@ logger = logging.getLogger(__name__)
 
 
 def split_url_events(events: List[Event]) -> List[Event]:
+    """
+     Split events that have a url attribute into a list of events. This is used to make sure that events are sent to Sensu in the right order and have the correct data
+     
+     @param events - A list of events to split
+     
+     @return A list of events with url attributes split into events that have a url attribute ( if present ) and
+    """
+    # This function will parse the event data and return the event data.
     for event in events:
+        # Event data is a dictionary of event data.
         if "url" in event.data:
             url = event.data["url"]
             parsed_url = urlparse(url)

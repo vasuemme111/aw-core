@@ -1,3 +1,4 @@
+# This is a copy of activitywatch. py but we don't want to change it. It's here for compatibility
 # Inspired by:
 # https://github.com/pypa/pipfile/blob/master/pipfile/__about__.py
 
