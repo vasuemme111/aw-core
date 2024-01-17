@@ -22,7 +22,7 @@ elif sys.platform == "darwin":
     print(libsqlcipher_path)
     openssl= ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
     libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
-    
+
 from aw_core.util import decrypt_uuid, load_key, start_all_module, stop_all_module
 import keyring
 import iso8601
@@ -67,10 +67,10 @@ LATEST_VERSION = 2
 def auto_migrate(db: Any, path: str) -> None:
     """
      Migrate bucketmodel to latest version. This is a wrapper around : func : ` ~sqlalchemy. orm. migrate ` to allow a user to specify a path to the database and to use it as a context manager.
-     
+
      @param db - The database to migrate. It must be a
      @param path - The path to the database.
-     
+
      @return None if no errors otherwise an error object with the errors
     """
     db.init(path)
@@ -93,7 +93,7 @@ def auto_migrate(db: Any, path: str) -> None:
 def chunks(ls, n):
     """
      Yield successive n - sized chunks from a list. This is useful for debugging and to ensure that chunks don't get stuck in memory at the cost of memory usage.
-     
+
      @param ls - List to split into chunks. Must be an instance of
      @param n - Number of chunks to
     """
@@ -105,10 +105,10 @@ def chunks(ls, n):
 def dt_plus_duration(dt, duration):
     """
      Add duration to a datetime. This is useful for displaying time stamps.
-     
+
      @param dt - datetime to add duration to. If it's a date we'll use it as the start of the time stamp.
      @param duration - duration to add to the datetime. If it's a number we'll add it to the end of the time stamp.
-     
+
      @return string with date and duration in YYYY - MM - DD HH : MM : SS
     """
     # See peewee docs on datemath: https://docs.peewee-orm.com/en/latest/peewee/hacks.html#date-math
@@ -138,8 +138,8 @@ class BucketModel(BaseModel):
     def json(self):
         """
          Convert to JSON for sending to API. This is used to create a request to the API.
-         
-         
+
+
          @return The JSON representation of the object as a dictionary. Note that the dictionary will be empty if there is no data
         """
         return {
@@ -166,11 +166,11 @@ class EventModel(BaseModel):
     def from_event(cls, bucket_key, event: Event):
         """
          Create a : class : ` Event ` from a Cloud Pub / Sub event.
-         
+
          @param cls - The class to use for the new event.
          @param bucket_key - The key of the bucket to use for the new event.
          @param event - The event to create the event from. Must have a non - empty : class : ` Event ` attribute.
-         
+
          @return The newly created : class : ` Event ` instance
         """
         return cls(
@@ -184,8 +184,8 @@ class EventModel(BaseModel):
     def json(self):
         """
          Convert to json for use in json. dumps. This is useful for debugging and to avoid having to re - serialize every time the object is serialized.
-         
-         
+
+
          @return A dict with the data that can be serialized by
         """
         return {
@@ -229,10 +229,10 @@ class PeeweeStorage(AbstractStorage):
     def __init__(self, testing: bool = True, filepath: Optional[str] = None) -> None:
         """
          Initialize the database. This is called by __init__ and should not be called directly
-         
+
          @param testing - If True will be used for testing
          @param filepath - Path to the database file ( default : None )
-         
+
          @return True if initialization was successful False if there was an
         """
         self.init_db()
@@ -240,10 +240,10 @@ class PeeweeStorage(AbstractStorage):
     def init_db(self, testing: bool = True, filepath: Optional[str] = None) -> bool:
         """
          Initialize or re - initialize the database. This is called by : py : meth : ` connect ` and
-         
+
          @param testing - If True use test data instead of production
          @param filepath - Path to the database file
-         
+
          @return True if the database was initialized False if it was
         """
         db_key = ""
@@ -273,7 +273,7 @@ class PeeweeStorage(AbstractStorage):
                     + ".db"
                 )
                 filepath = os.path.join(data_dir, filename)
-            
+
             try:
                 os.remove(filepath)
                 database_changed = True
@@ -343,8 +343,8 @@ class PeeweeStorage(AbstractStorage):
     def update_bucket_keys(self) -> None:
         """
          Update the bucket keys. This is called after the user has selected a bucket to update it's key and bucket_id
-         
-         
+
+
          @return None but raises an exception if there is no
         """
         buckets = BucketModel.select()
@@ -353,8 +353,8 @@ class PeeweeStorage(AbstractStorage):
     def buckets(self) -> Dict[str, Dict[str, Any]]:
         """
          Get all buckets. This is a dictionary of bucket IDs to JSON objects.
-         
-         
+
+
          @return A dictionary of bucket IDs to JSON objects keyed by bucket
         """
         return {bucket.id: bucket.json() for bucket in BucketModel.select()}
@@ -371,7 +371,7 @@ class PeeweeStorage(AbstractStorage):
     ):
         """
          Create a bucket and update bucket keys. This is a low - level method that should be used by clients that wish to perform operations on buckets such as uploading files to S3
-         
+
          @param bucket_id - The ID of the bucket to create
          @param type_id - The type of the bucket ( bucket_type )
          @param client - The client that owns the bucket. This is used to determine which buckets are owned by a client and can be used to retrieve information about the client '
@@ -402,14 +402,14 @@ class PeeweeStorage(AbstractStorage):
     ) -> None:
         """
          Update a bucket in the storage. This will update the bucket's type hostname name and data if provided.
-         
+
          @param bucket_id - The ID of the bucket to update.
          @param type_id - The type of the bucket ( bucket_type or bucket_id_url ).
          @param client - The client to use for this bucket. Defaults to the currently logged in client.
          @param hostname - The hostname of the client to use for this bucket. Defaults to the currently logged in client.
          @param name - The name of the bucket as it is stored in the data store.
          @param data - The data to update the bucket with. Must be JSON serializable.
-         
+
          @return The bucket that was updated or None if the bucket didn't exist
         """
         # Update the bucket with the given id
@@ -439,9 +439,9 @@ class PeeweeStorage(AbstractStorage):
     def delete_bucket(self, bucket_id: str) -> None:
         """
          Deletes a bucket and all events associated with it. This is useful for deleting buckets that are no longer needed
-         
+
          @param bucket_id - The id of the bucket to delete
-         
+
          @return True if success False if not ( exception is raised
         """
         # Delete the bucket and update the event model
@@ -459,9 +459,9 @@ class PeeweeStorage(AbstractStorage):
     def get_metadata(self, bucket_id: str):
         """
          Get metadata for a bucket. This is a wrapper around the get method to make it easier to use in tests
-         
+
          @param bucket_id - The id of the bucket
-         
+
          @return A dictionary of bucket metadata or None if the bucket doesn't
         """
         # Get the metadata for a given bucket
@@ -476,10 +476,10 @@ class PeeweeStorage(AbstractStorage):
     def insert_one(self, bucket_id: str, event: Event) -> Event:
         """
          Inserts a single event into the database. This is a convenience method for creating and persisting an : class : ` EventModel ` object from a bucket and event.
-         
+
          @param bucket_id - The bucket to insert into. Must be a string in the form ` ` bucket_keys [ bucket_id ] ` `.
          @param event - The event to insert. Must be a : class : ` Event ` object.
-         
+
          @return The newly inserted event. Note that you must call save () on the event before you call this
         """
         e = EventModel.from_event(self.bucket_keys[bucket_id], event)
@@ -490,7 +490,7 @@ class PeeweeStorage(AbstractStorage):
     def insert_many(self, bucket_id, events: List[Event]) -> None:
         """
          Insert a list of events into a bucket. This is a wrapper around insert_one to handle events that need to be updated and inserted in one batch
-         
+
          @param bucket_id - The bucket to insert into
          @param events - The events to insert ( must have id or not
         """
@@ -525,10 +525,10 @@ class PeeweeStorage(AbstractStorage):
     def _get_event(self, bucket_id, event_id) -> Optional[EventModel]:
         """
          Get an event from the database. This is used to find events that need to be sent to Peewee in order to process them
-         
+
          @param bucket_id - The bucket that the event belongs to
          @param event_id - The id of the event to retrieve
-         
+
          @return The event or None if not found ( in which case it is None
         """
         try:
@@ -540,17 +540,17 @@ class PeeweeStorage(AbstractStorage):
             )
         except peewee.DoesNotExist:
             return None
-        
+
     def _get_dashboard_events(self, starttime, endtime) -> []:
         """
         Get events that match the criteria from the data source. This is a helper function for : meth : ` get_dashboard_events `
-        
+
         @param starttime - Start time of the search
         @param endtime - End time of the search ( inclusive )
-        
+
         @return A list of events in chronological order of start
         """
- 
+
         # Define the raw SQL query with formatting
         raw_query = f"""
             SELECT
@@ -563,7 +563,8 @@ class PeeweeStorage(AbstractStorage):
                         'duration', duration,
                         'timestamp', timestamp,
                         'data', JSON(CAST(datastr AS TEXT)),
-                        'id', id
+                        'id', id,
+                        'bucket_id', bucket_id
                     )
                 ) AS formatted_events
             FROM
@@ -571,32 +572,33 @@ class PeeweeStorage(AbstractStorage):
             WHERE
                 timestamp >= '{starttime}'
                 AND timestamp <= '{endtime}'
+                AND duration > 0
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
                 AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
             ORDER BY
                 timestamp ASC;
         """
- 
+
         # Execute the raw query
         result = self.db.execute_sql(raw_query)
- 
+
         # Fetch the results
         rows = result.fetchall()
- 
+
         # Extract the formatted events from the first row
         formatted_events = json.loads(rows[0][0])
- 
+
         # Print the formatted events
         return formatted_events
-        
+
     def _get_most_used_apps(self, starttime, endtime) -> []:
         """
          Get most used apps in time period. This is used to determine how many apps are in the past and the time spent in each app.
-         
+
          @param starttime - start time of the period in unix epoch seconds
          @param endtime - end time of the period in unix epoch seconds
-         
+
          @return list of tuples ( app_name total_hours total_minutes total_seconds total_duration
         """
         # Define the raw SQL query
@@ -618,25 +620,25 @@ class PeeweeStorage(AbstractStorage):
             GROUP BY
                 app_name;
         """
- 
+
         # Execute the raw query
         result = self.db.execute_sql(raw_query)
- 
+
         # Fetch the results
         rows = result.fetchall()
- 
+
         # Create a list of dictionaries in the desired format
         formatted_results = [{'app': row[0], 'totalHours': row[1], 'totalMinutes': row[2], 'totalSeconds': row[3], 'totalDuration': row[4]} for row in rows]
- 
+
         # Fetch the results
         return formatted_results
 
     def _get_last(self, bucket_id) -> EventModel:
         """
          Get the last event in a bucket. This is used to determine when to stop the search in the case of an unresponsive bucket
-         
+
          @param bucket_id - The bucket to look up
-         
+
          @return The most up to date EventModel that was added
         """
         return (
@@ -649,10 +651,10 @@ class PeeweeStorage(AbstractStorage):
     def replace_last(self, bucket_id, event):
         """
          Replaces the last event in the bucket with the given event. This is useful for events that have been added in the middle of a batch.
-         
+
          @param bucket_id - The bucket to replace the last event in.
          @param event - The event to replace. Must be a : class : ` ~mediadrop. event. Event ` instance.
-         
+
          @return The event with the latest data replaced with the given
         """
         e = self._get_last(bucket_id)
@@ -666,10 +668,10 @@ class PeeweeStorage(AbstractStorage):
     def delete(self, bucket_id, event_id):
         """
          Delete an event from a bucket. This is useful for deleting events that are no longer associated with a bucket
-         
+
          @param bucket_id - The id of the bucket to delete the event from
          @param event_id - The id of the event to delete
-         
+
          @return The number of rows deleted or None if the event wasn't
         """
         return (
@@ -682,11 +684,11 @@ class PeeweeStorage(AbstractStorage):
     def replace(self, bucket_id, event_id, event):
         """
          Replaces an event with a new one. This is useful when you want to replace a previously existing event in the event store.
-         
+
          @param bucket_id - The ID of the bucket to replace the event in.
          @param event_id - The ID of the event to replace.
          @param event - The event to replace. It must have a timestamp duration and datastr set.
-         
+
          @return The updated event object. note :: The event is updated in - place
         """
         e = self._get_event(bucket_id, event_id)
@@ -757,7 +759,7 @@ class PeeweeStorage(AbstractStorage):
                     e.duration = endtime - e.timestamp
 
         return events
-    
+
     def get_most_used_apps(
         self,
         starttime: Optional[datetime] = None,
@@ -765,14 +767,14 @@ class PeeweeStorage(AbstractStorage):
     ) -> []:
         """
          Get most used apps in time period. This is a wrapper around _get_most_used_apps
-         
+
          @param starttime - start time of the period ( optional ). If not specified will default to now
          @param endtime - end time of the period ( optional ). If not specified will default to now
-         
+
          @return a list of app objects sorted by time ( oldest to newest
         """
         return self._get_most_used_apps(starttime, endtime)
-    
+
     def get_dashboard_events(
         self,
         starttime: Optional[datetime] = None,
@@ -780,10 +782,10 @@ class PeeweeStorage(AbstractStorage):
     ) -> []:
         """
          Get a list of dashboard events. This is a wrapper around _get_dashboard_events that does not require a start and end datetime
-         
+
          @param starttime - The start datetime to get events from
          @param endtime - The end datetime to get events to ( inclusive )
-         
+
          @return A list of : class : ` DashboardEvent `
         """
         return self._get_dashboard_events(starttime, endtime)
@@ -796,11 +798,11 @@ class PeeweeStorage(AbstractStorage):
     ) -> int:
         """
          Get the number of events in a bucket. This is useful for determining how many events have been added since the start of the interval.
-         
+
          @param bucket_id - The bucket to look up events in
          @param starttime - The start of the interval to look up events in
          @param endtime - The end of the interval to look up events in
-         
+
          @return The number of events in the given time range in
         """
         q = EventModel.select().where(EventModel.bucket == self.bucket_keys[bucket_id])
@@ -815,11 +817,11 @@ class PeeweeStorage(AbstractStorage):
     ):
         """
          Filter a query to a range of events. This is a helper for _get_events to add support for time ranges
-         
+
          @param q - query to filter ( sqlalchemy. sql. expression. WHERE )
          @param starttime - start time of the range ( datetime. datetime )
          @param endtime - end time of the range ( datetime. datetime )
-         
+
          @return query with filters applied to the start and end time
         """
         # Important to normalize datetimes to UTC, otherwise any UTC offset will be ignored
