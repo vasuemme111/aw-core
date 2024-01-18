@@ -614,7 +614,7 @@ class PeeweeStorage(AbstractStorage):
                 AND timestamp <= '{endtime}'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
-                AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
+                AND IFNULL(JSON_EXTRACT(datastr, '$.app'), '') NOT LIKE '%afk%'
             GROUP BY
                 app_name;
         """
