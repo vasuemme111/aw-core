@@ -37,8 +37,14 @@ CREATE_EVENTS_TABLE = """
         starttime INTEGER NOT NULL,
         endtime INTEGER NOT NULL,
         datastr TEXT NOT NULL,
+        server_sync_status INTEGER default 0,
         FOREIGN KEY (bucketrow) REFERENCES buckets(rowid)
     )
+"""
+
+ADD_COLUMN_SERVER_SYNC_STATUS = """
+    ALTER TABLE events
+    ADD server_sync_status INTEGER default 0
 """
 
 INDEX_BUCKETS_TABLE_ID = """
@@ -90,6 +96,7 @@ class SqliteStorage(AbstractStorage):
         # Create tables
         self.conn.execute(CREATE_BUCKETS_TABLE)
         self.conn.execute(CREATE_EVENTS_TABLE)
+        self.conn.execute(ADD_COLUMN_SERVER_SYNC_STATUS)
         self.conn.execute(INDEX_BUCKETS_TABLE_ID)
         self.conn.execute(INDEX_EVENTS_TABLE_STARTTIME)
         self.conn.execute(INDEX_EVENTS_TABLE_ENDTIME)

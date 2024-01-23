@@ -87,6 +87,15 @@ def auto_migrate(db: Any, path: str) -> None:
         with db.atomic():
             migrate(migrator.add_column("bucketmodel", "datastr", datastr_field))
 
+    info = db.execute_sql("PRAGMA table_info(eventmodel)")
+    has_server_sync_status = any(row[1] == "server_sync_status" for row in info)
+
+    # Add the server_sync_status_field column to the eventmodel.
+    if not has_server_sync_status:
+        server_sync_status_field = IntegerField(default=0)
+        with db.atomic():
+            migrate(migrator.add_column("eventmodel", "server_sync_status", server_sync_status_field))
+
     db.close()
 
 
@@ -161,6 +170,7 @@ class EventModel(BaseModel):
     timestamp = DateTimeField(index=True, default=datetime.now)
     duration = DecimalField()
     datastr = CharField()
+    server_sync_status = IntegerField(default=0)
 
     @classmethod
     def from_event(cls, bucket_key, event: Event):
@@ -179,6 +189,7 @@ class EventModel(BaseModel):
             timestamp=event.timestamp,
             duration=event.duration.total_seconds(),
             datastr=json.dumps(event.data),
+            server_sync_status=0
         )
 
     def json(self):
@@ -193,6 +204,7 @@ class EventModel(BaseModel):
             "timestamp": self.timestamp,
             "duration": float(self.duration),
             "data": json.loads(self.datastr),
+            "server_sync_status": self.server_sync_status
         }
 
 class SettingsModel(BaseModel):
@@ -522,6 +534,9 @@ class PeeweeStorage(AbstractStorage):
         for chunk in chunks(events_dictlist, 100):
             EventModel.insert_many(chunk).execute()
 
+    def update_server_sync_status(self, list_of_ids, new_status):
+        EventModel.update(server_sync_status=new_status).where(EventModel.id.in_(list_of_ids)).execute()
+
     def _get_event(self, bucket_id, event_id) -> Optional[EventModel]:
         """
          Get an event from the database. This is used to find events that need to be sent to Peewee in order to process them
@@ -573,6 +588,56 @@ class PeeweeStorage(AbstractStorage):
                 timestamp >= '{starttime}'
                 AND timestamp <= '{endtime}'
                 AND duration > 0
+                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
+                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
+                AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
+            ORDER BY
+                timestamp ASC;
+        """
+
+        # Execute the raw query
+        result = self.db.execute_sql(raw_query)
+
+        # Fetch the results
+        rows = result.fetchall()
+
+        # Extract the formatted events from the first row
+        formatted_events = json.loads(rows[0][0])
+
+        # Print the formatted events
+        return formatted_events
+
+    def _get_non_sync_events(self) -> []:
+        """
+        Get events that match the criteria from the data source. This is a helper function for : meth : ` get_dashboard_events `
+
+        @param starttime - Start time of the search
+        @param endtime - End time of the search ( inclusive )
+
+        @return A list of events in chronological order of start
+        """
+
+        # Define the raw SQL query with formatting
+        raw_query = f"""
+            SELECT
+                JSON_GROUP_ARRAY(
+                    JSON_OBJECT(
+                        'start', STRFTIME('%Y-%m-%dT%H:%M:%SZ', timestamp),
+                        'end', STRFTIME('%Y-%m-%dT%H:%M:%SZ', DATETIME(timestamp, '+' || duration || ' seconds')),
+                        'event_id', id,
+                        'title', JSON_EXTRACT(datastr, '$.title'),
+                        'duration', duration,
+                        'timestamp', timestamp,
+                        'data', JSON(CAST(datastr AS TEXT)),
+                        'id', id,
+                        'bucket_id', bucket_id
+                    )
+                ) AS formatted_events
+            FROM
+                eventmodel
+            WHERE
+                duration > 0
+                AND server_sync_status = 0
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
                 AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
@@ -789,6 +854,12 @@ class PeeweeStorage(AbstractStorage):
          @return A list of : class : ` DashboardEvent `
         """
         return self._get_dashboard_events(starttime, endtime)
+
+    def get_non_sync_events(
+        self
+    ) -> []:
+
+        return self._get_non_sync_events()
 
     def get_eventcount(
         self,
