@@ -495,6 +495,7 @@ class PeeweeStorage(AbstractStorage):
          @return The newly inserted event. Note that you must call save () on the event before you call this
         """
         e = EventModel.from_event(self.bucket_keys[bucket_id], event)
+        e.server_sync_status = 0
         e.save()
         event.id = e.id
         return event
@@ -587,7 +588,7 @@ class PeeweeStorage(AbstractStorage):
             WHERE
                 timestamp >= '{starttime}'
                 AND timestamp <= '{endtime}'
-                AND duration > 0
+                AND duration > 59
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
                 AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
@@ -636,7 +637,7 @@ class PeeweeStorage(AbstractStorage):
             FROM
                 eventmodel
             WHERE
-                duration > 0
+                duration > 59
                 AND server_sync_status = 0
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
@@ -679,6 +680,8 @@ class PeeweeStorage(AbstractStorage):
             WHERE
                 timestamp >= '{starttime}'
                 AND timestamp <= '{endtime}'
+                AND duration > 59
+                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%afk%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
                 AND IFNULL(JSON_EXTRACT(datastr, '$.app'), '') NOT LIKE '%afk%'
@@ -726,6 +729,7 @@ class PeeweeStorage(AbstractStorage):
         e.timestamp = event.timestamp
         e.duration = event.duration.total_seconds()
         e.datastr = json.dumps(event.data)
+        e.server_sync_status = 0
         e.save()
         event.id = e.id
         return event
@@ -760,6 +764,7 @@ class PeeweeStorage(AbstractStorage):
         e.timestamp = event.timestamp
         e.duration = event.duration.total_seconds()
         e.datastr = json.dumps(event.data)
+        e.server_sync_status = 0
         e.save()
         event.id = e.id
         return event
