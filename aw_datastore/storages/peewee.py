@@ -588,7 +588,7 @@ class PeeweeStorage(AbstractStorage):
             WHERE
                 timestamp >= '{starttime}'
                 AND timestamp <= '{endtime}'
-                AND duration > 59
+                AND duration > 30
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
                 AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
@@ -637,7 +637,7 @@ class PeeweeStorage(AbstractStorage):
             FROM
                 eventmodel
             WHERE
-                duration > 59
+                duration > 30
                 AND server_sync_status = 0
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
@@ -680,7 +680,7 @@ class PeeweeStorage(AbstractStorage):
             WHERE
                 timestamp >= '{starttime}'
                 AND timestamp <= '{endtime}'
-                AND duration > 59
+                AND duration > 30
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%afk%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
