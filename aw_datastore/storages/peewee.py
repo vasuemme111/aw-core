@@ -9,6 +9,7 @@ from typing import (
     List,
     Optional,
 )
+import re
 # Creates and returns a node list for the current module. This is a bit tricky because we don't want to create a DLL and the SQLCipher libraries are in the same directory as the module
 import ctypes
 import tldextract
@@ -261,13 +262,10 @@ class EventModel(BaseModel):
 
         @return The newly created EventModel instance
         """
-        system = platform.system()
-
         if not event.data.get('url'):
-            if system == 'Darwin':  # macOS
-                app_name = event.data.get('app', '')
-            else:
-                app_name = event.data.get('title', '')
+            app_name = event.data.get('app', '')
+            if ".exe" in app_name.lower():
+                app_name = re.sub(r'\.exe$', '', app_name)
         else:
             app_name = tldextract.extract(event.data.get('url', '')).domain
 
@@ -1088,7 +1086,7 @@ class PeeweeStorage(AbstractStorage):
             if not created:
                 # If the settings object already exists, update the code and value
                 settings.code = code
-                settings.value = value
+                settings.value = value  # Set value as empty string if it's empty
                 settings.save()  # Save the changes to the database
 
             return settings  # Return the settings object, whether it was created or updated

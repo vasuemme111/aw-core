@@ -9,7 +9,7 @@ from typing import (
     Optional,
     Union,
 )
-
+import re
 import iso8601
 from tldextract import tldextract
 
@@ -116,8 +116,10 @@ class Event(dict):
         self.app = data.get('app', '')
         self.title = data.get('title', '')
         self.url = data.get('url', '')
-        if self.url == "":
-            app_name = data.get('app')
+        if not self.url:
+            app_name = self.app
+            if ".exe" in app_name.lower():
+                app_name = re.sub(r'\.exe$', '', app_name)
         else:
             app_name = tldextract.extract(self.url).domain
         self.application_name = app_name
