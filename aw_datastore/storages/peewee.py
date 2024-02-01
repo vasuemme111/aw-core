@@ -11,7 +11,11 @@ from typing import (
 )
 # Creates and returns a node list for the current module. This is a bit tricky because we don't want to create a DLL and the SQLCipher libraries are in the same directory as the module
 import ctypes
+import tldextract
+from playhouse.shortcuts import model_to_dict
+
 from aw_core.cache import cache_user_credentials
+
 if sys.platform == "win32":
     _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
     os.add_dll_directory(_module_dir)
@@ -19,8 +23,7 @@ elif sys.platform == "darwin":
     _module_dir = os.path.dirname(os.path.realpath(__file__))
     _parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(os.path.join(_module_dir, os.pardir))))
     libsqlcipher_path = _parent_dir
-    print(libsqlcipher_path)
-    openssl= ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
+    openssl = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
     libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
 
 from aw_core.util import decrypt_uuid, load_key, start_all_module, stop_all_module
@@ -37,6 +40,7 @@ from peewee import (
     CharField,
     DateTimeField,
     DecimalField,
+    BooleanField,
     ForeignKeyField,
     IntegerField,
     Model,
@@ -59,10 +63,10 @@ peewee_logger.setLevel(logging.INFO)
 # Another option would be to use peewee's Proxy.
 #   See: http://docs.peewee-orm.com/en/latest/peewee/database.html#dynamic-db
 db_proxy = DatabaseProxy()
-_db=None
-
+_db = None
 
 LATEST_VERSION = 2
+
 
 def auto_migrate(db: Any, path: str) -> None:
     """
@@ -108,7 +112,7 @@ def chunks(ls, n):
     """
     # Generator that yields all n elements of ls
     for i in range(0, len(ls), n):
-        yield ls[i : i + n]
+        yield ls[i: i + n]
 
 
 def dt_plus_duration(dt, duration):
@@ -129,9 +133,8 @@ def dt_plus_duration(dt, duration):
 
 
 class BaseModel(Model):
-
     class Meta:
-        database=db_proxy
+        database = db_proxy
 
 
 class BucketModel(BaseModel):
@@ -164,64 +167,152 @@ class BucketModel(BaseModel):
         }
 
 
+import platform
+
+
 class EventModel(BaseModel):
     id = AutoField()
     bucket = ForeignKeyField(BucketModel, backref="events", index=True)
     timestamp = DateTimeField(index=True, default=datetime.now)
     duration = DecimalField()
     datastr = CharField()
+    app = CharField()
+    title = CharField()
+    url = CharField()
+    application_name = CharField()
     server_sync_status = IntegerField(default=0)
 
     @classmethod
     def from_event(cls, bucket_key, event: Event):
         """
-         Create a : class : ` Event ` from a Cloud Pub / Sub event.
+        Create an EventModel instance from a Cloud Pub/Sub event.
 
-         @param cls - The class to use for the new event.
-         @param bucket_key - The key of the bucket to use for the new event.
-         @param event - The event to create the event from. Must have a non - empty : class : ` Event ` attribute.
+        @param cls - The class to use for the new event.
+        @param bucket_key - The key of the bucket to use for the new event.
+        @param event - The event to create the event from. Must have a non-empty Event attribute.
 
-         @return The newly created : class : ` Event ` instance
+        @return The newly created EventModel instance
         """
+        system = platform.system()
+
+        if not event.data.get('url'):
+            if system == 'Darwin':  # macOS
+                app_name = event.data.get('app')
+            else:
+                app_name = event.data.get('title')
+        else:
+            app_name = tldextract.extract(event.data.get('url', '')).domain
+
         return cls(
             bucket=bucket_key,
             id=event.id,
             timestamp=event.timestamp,
             duration=event.duration.total_seconds(),
             datastr=json.dumps(event.data),
+            app=json.dumps(event.data.get('app', '')),
+            title=json.dumps(event.data.get('title', '')),
+            url=json.dumps(event.data.get('url', '')),
+            application_name=json.dumps(app_name),
             server_sync_status=0
         )
 
     def json(self):
         """
-         Convert to json for use in json. dumps. This is useful for debugging and to avoid having to re - serialize every time the object is serialized.
+        Convert to JSON for use in json.dumps. This is useful for debugging and to avoid having to re-serialize every time the object is serialized.
 
-
-         @return A dict with the data that can be serialized by
+        @return A dict with the data that can be serialized
         """
         return {
             "id": self.id,
             "timestamp": self.timestamp,
             "duration": float(self.duration),
             "data": json.loads(self.datastr),
+            "app": json.loads(self.app),
+            "title": json.loads(self.title),
+            "url": json.loads(self.url),
+            "application_name": json.loads(self.application_name),
             "server_sync_status": self.server_sync_status
         }
 
-class SettingsModel(BaseModel):
+
+import platform
+
+
+class EventModel(BaseModel):
     id = AutoField()
-    settings = CharField()
+    bucket = ForeignKeyField(BucketModel, backref="events", index=True)
+    timestamp = DateTimeField(index=True, default=datetime.now)
+    duration = DecimalField()
+    datastr = CharField()
+    app = CharField()
+    title = CharField()
+    url = CharField()
+    application_name = CharField()
+    server_sync_status = IntegerField(default=0)
 
     @classmethod
-    def from_settings(cls, settings_id, settings_dict):
+    def from_event(cls, bucket_key, event: Event):
         """
-        Create a SettingsModel instance from settings dictionary.
-        :param settings_id: The ID for the settings.
-        :param settings_dict: A dictionary containing the settings.
-        :return: A SettingsModel instance.
+        Create an EventModel instance from a Cloud Pub/Sub event.
+
+        @param cls - The class to use for the new event.
+        @param bucket_key - The key of the bucket to use for the new event.
+        @param event - The event to create the event from. Must have a non-empty Event attribute.
+
+        @return The newly created EventModel instance
         """
+        system = platform.system()
+
+        if not event.data.get('url'):
+            if system == 'Darwin':  # macOS
+                app_name = event.data.get('app', '')
+            else:
+                app_name = event.data.get('title', '')
+        else:
+            app_name = tldextract.extract(event.data.get('url', '')).domain
+
         return cls(
-            id=settings_id,
-            settings=json.dumps(settings_dict)
+            bucket=bucket_key,
+            id=event.id,
+            timestamp=event.timestamp,
+            duration=event.duration.total_seconds(),
+            datastr=json.dumps(event.data),
+            app=json.dumps(event.data.get('app', '')),
+            title=json.dumps(event.data.get('title', '')),
+            url=json.dumps(event.data.get('url', '')),
+            application_name=json.dumps(app_name),
+            server_sync_status=0
+        )
+
+    def json(self):
+        """
+        Convert to JSON for use in json.dumps. This is useful for debugging and to avoid having to re-serialize every time the object is serialized.
+
+        @return A dict with the data that can be serialized
+        """
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp,
+            "duration": float(self.duration),
+            "data": json.loads(self.datastr),
+            "app": json.loads(self.app),
+            "title": json.loads(self.title),
+            "url": json.loads(self.url),
+            "application_name": json.loads(self.application_name),
+            "server_sync_status": self.server_sync_status
+        }
+
+
+class SettingsModel(BaseModel):
+    id = AutoField()
+    code = CharField()
+    value = CharField()
+
+    @classmethod
+    def from_settings(cls, code, value):
+        return cls(
+            code=json.dumps(code),
+            value=json.dumps(value)
         )
 
     def json(self):
@@ -231,7 +322,63 @@ class SettingsModel(BaseModel):
         """
         return {
             "id": self.id,
-            "settings": json.loads(self.settings)
+            "code": json.loads(self.code),
+            "value": json.loads(self.value)
+
+        }
+
+
+class ApplicationModel(BaseModel):
+    id = AutoField()
+    type = CharField()
+    name = CharField(null=False, unique=True)
+    alias = CharField(null=True)
+    is_blocked = BooleanField(default=False)
+    is_ignore_idle_time = BooleanField(default=False)
+    color = CharField(null=True)
+    created_at = DateTimeField(default=datetime.now)
+    updated_at = DateTimeField(default=datetime.now)
+
+    @classmethod
+    def from_application_details(cls, application_details):
+        existing_instance = cls.get_or_none(name=application_details.get("name", ""))
+        if existing_instance is None:
+            current_time = datetime.now()
+            return cls(
+                type=json.dumps(application_details.get("type", "")),
+                name=json.dumps(application_details.get("name", "")),
+                alias=json.dumps(application_details.get("alias", "")),
+                is_blocked=application_details.get("is_blocked", False),
+                is_ignore_idle_time=application_details.get("idle_time_ignored", False),
+                color=json.dumps(application_details.get("color", "")),
+                created_at=current_time,
+                updated_at=current_time,
+            )
+        else:
+            existing_instance.type = json.dumps(application_details.get("type", ""))
+            existing_instance.alias = json.dumps(application_details.get("alias", ""))
+            existing_instance.is_blocked = application_details.get("is_blocked", False)
+            existing_instance.is_ignore_idle_time = application_details.get("idle_time_ignored", False)
+            existing_instance.color = json.dumps(application_details.get("color", ""))
+            existing_instance.updated_at = datetime.now()
+            existing_instance.save()
+            return existing_instance
+
+    def json(self):
+        """
+        Convert the model instance to a JSON-compatible dictionary.
+        :return: A dictionary representation of the settings.
+        """
+        return {
+            "id": self.id,
+            "type": self.type,
+            "name": self.name,
+            "alias": self.alias,
+            "is_blocked": self.is_blocked,
+            "is_ignore_idle_time": self.is_ignore_idle_time,
+            "color": self.color,
+            "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
+            "updated_at": self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
         }
 
 
@@ -279,10 +426,10 @@ class PeeweeStorage(AbstractStorage):
             # If not filepath is not set create a new file in data_dir.
             if not filepath:
                 filename = (
-                    "peewee-sqlite"
-                    + ("-testing" if testing else "")
-                    + f".v{LATEST_VERSION}"
-                    + ".db"
+                        "peewee-sqlite"
+                        + ("-testing" if testing else "")
+                        + f".v{LATEST_VERSION}"
+                        + ".db"
                 )
                 filepath = os.path.join(data_dir, filename)
 
@@ -306,11 +453,11 @@ class PeeweeStorage(AbstractStorage):
             # Check if the database file is changed.
             if not filepath:
                 filename = (
-                    "peewee-sqlite"
-                    + ("-testing" if testing else "")
-                    + f"-{user_email}"
-                    + f".v{LATEST_VERSION}"
-                    + ".db"
+                        "peewee-sqlite"
+                        + ("-testing" if testing else "")
+                        + f"-{user_email}"
+                        + f".v{LATEST_VERSION}"
+                        + ".db"
                 )
                 filepath = os.path.join(data_dir, filename)
             else:
@@ -318,7 +465,6 @@ class PeeweeStorage(AbstractStorage):
                 # If the file is not the same as the data directory as the data directory.
                 if filepath != os.path.join(data_dir, filename):
                     database_changed = True
-
             _db = SqlCipherDatabase(None, passphrase=password)
             db_proxy.initialize(_db)
             self.db = _db
@@ -330,6 +476,7 @@ class PeeweeStorage(AbstractStorage):
                 BucketModel.create_table(safe=True)
                 EventModel.create_table(safe=True)
                 SettingsModel.create_table(safe=True)
+                ApplicationModel.create_table(safe=True)
                 database_changed = True  # Assume tables creation is a change
             except Exception:
                 pass  # If tables already exist, it's not a change
@@ -351,7 +498,6 @@ class PeeweeStorage(AbstractStorage):
 
             return True
 
-
     def update_bucket_keys(self) -> None:
         """
          Update the bucket keys. This is called after the user has selected a bucket to update it's key and bucket_id
@@ -372,14 +518,14 @@ class PeeweeStorage(AbstractStorage):
         return {bucket.id: bucket.json() for bucket in BucketModel.select()}
 
     def create_bucket(
-        self,
-        bucket_id: str,
-        type_id: str,
-        client: str,
-        hostname: str,
-        created: str,
-        name: Optional[str] = None,
-        data: Optional[Dict[str, Any]] = None,
+            self,
+            bucket_id: str,
+            type_id: str,
+            client: str,
+            hostname: str,
+            created: str,
+            name: Optional[str] = None,
+            data: Optional[Dict[str, Any]] = None,
     ):
         """
          Create a bucket and update bucket keys. This is a low - level method that should be used by clients that wish to perform operations on buckets such as uploading files to S3
@@ -404,13 +550,13 @@ class PeeweeStorage(AbstractStorage):
         self.update_bucket_keys()
 
     def update_bucket(
-        self,
-        bucket_id: str,
-        type_id: Optional[str] = None,
-        client: Optional[str] = None,
-        hostname: Optional[str] = None,
-        name: Optional[str] = None,
-        data: Optional[dict] = None,
+            self,
+            bucket_id: str,
+            type_id: Optional[str] = None,
+            client: Optional[str] = None,
+            hostname: Optional[str] = None,
+            name: Optional[str] = None,
+            data: Optional[dict] = None,
     ) -> None:
         """
          Update a bucket in the storage. This will update the bucket's type hostname name and data if provided.
@@ -696,7 +842,8 @@ class PeeweeStorage(AbstractStorage):
         rows = result.fetchall()
 
         # Create a list of dictionaries in the desired format
-        formatted_results = [{'app': row[0], 'totalHours': row[1], 'totalMinutes': row[2], 'totalSeconds': row[3], 'totalDuration': row[4]} for row in rows]
+        formatted_results = [{'app': row[0], 'totalHours': row[1], 'totalMinutes': row[2], 'totalSeconds': row[3],
+                              'totalDuration': row[4]} for row in rows]
 
         # Fetch the results
         return formatted_results
@@ -770,9 +917,9 @@ class PeeweeStorage(AbstractStorage):
         return event
 
     def get_event(
-        self,
-        bucket_id: str,
-        event_id: int,
+            self,
+            bucket_id: str,
+            event_id: int,
     ) -> Optional[Event]:
         """
         Fetch a single event from a bucket.
@@ -781,11 +928,11 @@ class PeeweeStorage(AbstractStorage):
         return Event(**EventModel.json(res)) if res else None
 
     def get_events(
-        self,
-        bucket_id: str,
-        limit: int,
-        starttime: Optional[datetime] = None,
-        endtime: Optional[datetime] = None,
+            self,
+            bucket_id: str,
+            limit: int,
+            starttime: Optional[datetime] = None,
+            endtime: Optional[datetime] = None,
     ):
         """
         Fetch events from a certain bucket, optionally from a given range of time.
@@ -831,9 +978,9 @@ class PeeweeStorage(AbstractStorage):
         return events
 
     def get_most_used_apps(
-        self,
-        starttime: Optional[datetime] = None,
-        endtime: Optional[datetime] = None,
+            self,
+            starttime: Optional[datetime] = None,
+            endtime: Optional[datetime] = None,
     ) -> []:
         """
          Get most used apps in time period. This is a wrapper around _get_most_used_apps
@@ -846,9 +993,9 @@ class PeeweeStorage(AbstractStorage):
         return self._get_most_used_apps(starttime, endtime)
 
     def get_dashboard_events(
-        self,
-        starttime: Optional[datetime] = None,
-        endtime: Optional[datetime] = None,
+            self,
+            starttime: Optional[datetime] = None,
+            endtime: Optional[datetime] = None,
     ) -> []:
         """
          Get a list of dashboard events. This is a wrapper around _get_dashboard_events that does not require a start and end datetime
@@ -861,16 +1008,16 @@ class PeeweeStorage(AbstractStorage):
         return self._get_dashboard_events(starttime, endtime)
 
     def get_non_sync_events(
-        self
+            self
     ) -> []:
 
         return self._get_non_sync_events()
 
     def get_eventcount(
-        self,
-        bucket_id: str,
-        starttime: Optional[datetime] = None,
-        endtime: Optional[datetime] = None,
+            self,
+            bucket_id: str,
+            starttime: Optional[datetime] = None,
+            endtime: Optional[datetime] = None,
     ) -> int:
         """
          Get the number of events in a bucket. This is useful for determining how many events have been added since the start of the interval.
@@ -886,10 +1033,10 @@ class PeeweeStorage(AbstractStorage):
         return q.count()
 
     def _where_range(
-        self,
-        q,
-        starttime: Optional[datetime] = None,
-        endtime: Optional[datetime] = None,
+            self,
+            q,
+            starttime: Optional[datetime] = None,
+            endtime: Optional[datetime] = None,
     ):
         """
          Filter a query to a range of events. This is a helper for _get_events to add support for time ranges
@@ -925,21 +1072,26 @@ class PeeweeStorage(AbstractStorage):
 
         return q
 
-    def save_settings(self, settings_id, settings_dict):
+    def save_settings(self, code, value):
         """
         Save or update settings in the database.
         :param settings_id: The unique identifier for the settings.
-        :param settings_dict: A dictionary containing the settings to be saved.
-        :return: The saved settings object.
+        :param code: The code associated with the settings.
+        :param value: The value of the settings to be saved.
+        :return: The saved or updated settings object.
         """
         try:
-            # Check if 'id' is the appropriate field to use here
-            settings, created = SettingsModel.get_or_create(id=settings_id,
-                                                            defaults={'settings': json.dumps(settings_dict)})
+            # Attempt to retrieve an existing settings object or create a new one if it doesn't exist
+            settings, created = SettingsModel.get_or_create(code=code,
+                                                            defaults={'value': value})
+
             if not created:
-                settings.settings = json.dumps(settings_dict)
-                settings.save()
-            return settings
+                # If the settings object already exists, update the code and value
+                settings.code = code
+                settings.value = value
+                settings.save()  # Save the changes to the database
+
+            return settings  # Return the settings object, whether it was created or updated
         except peewee.IntegrityError as e:
             logger.error(f"Integrity error while saving settings: {e}")
             raise
@@ -947,14 +1099,60 @@ class PeeweeStorage(AbstractStorage):
             logger.error(f"An unexpected error occurred while saving settings: {e}")
             raise
 
-    def retrieve_settings(self, settings_id):
+    def retrieve_settings(self, code):
         """
         Retrieve settings from the database.
         :param settings_id: The unique identifier for the settings.
         :return: A dictionary of the settings if found, otherwise None.
         """
         try:
-            settings = SettingsModel.get(SettingsModel.id == settings_id)
-            return json.loads(settings.settings)
+            settings = SettingsModel.get(SettingsModel.code == code)
+            return json.loads(settings.value)
         except SettingsModel.DoesNotExist:
+            return None
+
+    def save_application_details(self, application_details):
+        """
+        Save or update application details in the database.
+        :param application_details: A dictionary containing the details of the application.
+        :return: The saved or updated ApplicationModel object.
+        """
+        try:
+            # Attempt to retrieve an existing application object or create a new one if it doesn't exist
+            application, created = ApplicationModel.get_or_create(name=application_details['name'],
+                                                                  defaults=application_details)
+
+            if not created:
+                # If the application object already exists, update its details
+                for key, value in application_details.items():
+                    setattr(application, key, value)
+                application.updated_at = datetime.now()  # Update the 'updated_at' field to current time
+                application.save()  # Save the changes to the database
+
+            return application  # Return the application object, whether it was created or updated
+        except peewee.IntegrityError as e:
+            logger.error(f"Integrity error while saving application details: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred while saving application details: {e}")
+            raise
+
+    def retrieve_application_details(self):
+        """
+        Retrieve all application details from the database.
+        :return: A JSON-serializable list of dictionaries with all application details if found, otherwise None.
+        """
+        try:
+            # Use a query to retrieve all application details
+            query = ApplicationModel.select()
+            application_details = [model_to_dict(app) for app in query]
+
+            # Serialize datetime objects to strings
+            for app_detail in application_details:
+                for key, value in app_detail.items():
+                    if isinstance(value, datetime):
+                        app_detail[key] = value.strftime('%Y-%m-%d %H:%M:%S')
+
+            return application_details if application_details else None
+        except ApplicationModel.DoesNotExist:
             return None

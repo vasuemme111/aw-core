@@ -46,14 +46,14 @@ class AbstractStorage(metaclass=ABCMeta):
 
     @abstractmethod
     def create_bucket(
-        self,
-        bucket_id: str,
-        type_id: str,
-        client: str,
-        hostname: str,
-        created: str,
-        name: Optional[str] = None,
-        data: Optional[dict] = None,
+            self,
+            bucket_id: str,
+            type_id: str,
+            client: str,
+            hostname: str,
+            created: str,
+            name: Optional[str] = None,
+            data: Optional[dict] = None,
     ) -> None:
         """
          Creates a bucket. This is a non - blocking call and will return immediately. The bucket must be in the ACTIVE state before it can be created.
@@ -72,13 +72,13 @@ class AbstractStorage(metaclass=ABCMeta):
 
     @abstractmethod
     def update_bucket(
-        self,
-        bucket_id: str,
-        type_id: Optional[str] = None,
-        client: Optional[str] = None,
-        hostname: Optional[str] = None,
-        name: Optional[str] = None,
-        data: Optional[dict] = None,
+            self,
+            bucket_id: str,
+            type_id: Optional[str] = None,
+            client: Optional[str] = None,
+            hostname: Optional[str] = None,
+            name: Optional[str] = None,
+            data: Optional[dict] = None,
     ) -> None:
         """
          Updates an existing bucket. You must provide at least one of the parameters. Required Permissions ** : To use this action an IAM user must have a Manage permissions level for the stack or an attached policy that explicitly grants permissions. For more information on user permissions see ` Managing User Permissions ` _.
@@ -118,9 +118,9 @@ class AbstractStorage(metaclass=ABCMeta):
 
     @abstractmethod
     def get_event(
-        self,
-        bucket_id: str,
-        event_id: int,
+            self,
+            bucket_id: str,
+            event_id: int,
     ) -> Optional[Event]:
         """
          Retrieves an event by bucket and event id. This is a low - level method that should be implemented by subclasses.
@@ -134,11 +134,11 @@ class AbstractStorage(metaclass=ABCMeta):
 
     @abstractmethod
     def get_events(
-        self,
-        bucket_id: str,
-        limit: int,
-        starttime: Optional[datetime] = None,
-        endtime: Optional[datetime] = None,
+            self,
+            bucket_id: str,
+            limit: int,
+            starttime: Optional[datetime] = None,
+            endtime: Optional[datetime] = None,
     ) -> List[Event]:
         """
          Get events from a bucket. This is a low - level method that should be used by clients to query the events in a bucket.
@@ -153,10 +153,10 @@ class AbstractStorage(metaclass=ABCMeta):
         raise NotImplementedError
 
     def get_eventcount(
-        self,
-        bucket_id: str,
-        starttime: Optional[datetime] = None,
-        endtime: Optional[datetime] = None,
+            self,
+            bucket_id: str,
+            starttime: Optional[datetime] = None,
+            endtime: Optional[datetime] = None,
     ) -> int:
         """
          Get the number of events in a bucket. This is a low - level method that should be implemented by subclasses.
@@ -254,6 +254,12 @@ class AbstractStorage(metaclass=ABCMeta):
         """
         raise NotImplementedError
 
+    def save_application_details(self, application_details):
+        raise NotImplementedError
+
+    def retrieve_application_details(self) -> dict:
+        raise NotImplementedError
+
     @abstractmethod
     def get_most_used_apps(self, starttime, endtime) -> []:
         """
@@ -280,7 +286,6 @@ class AbstractStorage(metaclass=ABCMeta):
 
     @abstractmethod
     def get_non_sync_events(self) -> []:
-
         raise NotImplementedError
 
     @abstractmethod

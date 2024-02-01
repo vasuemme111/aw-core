@@ -99,6 +99,11 @@ class Datastore:
          @return dict of settings or None if not found or could not be retrieved from the storage strategy for any reason
         """
         return self.storage_strategy.retrieve_settings(settings_id)
+
+    def save_application_details(self, application_details):
+        return self.storage_strategy.save_application_details(application_details=application_details)
+    def retrieve_application_details(self) -> dict:
+        return self.storage_strategy.retrieve_application_details()
     def create_bucket(
         self,
         bucket_id: str,

@@ -11,16 +11,20 @@ from typing import (
 )
 
 import iso8601
+from tldextract import tldextract
 
 logger = logging.getLogger(__name__)
-
 
 Number = Union[int, float]
 Id = Optional[Union[int, str]]
 ConvertibleTimestamp = Union[datetime, str]
 Duration = Union[timedelta, Number]
 Data = Dict[str, Any]
-server_sync_status=Number
+app = str
+title = str
+url = str
+application_name=str
+server_sync_status = Number
 
 
 def _timestamp_parse(ts_in: ConvertibleTimestamp) -> datetime:
@@ -50,13 +54,39 @@ class Event(dict):
     Used to represents an event.
     """
 
+    def __eq__(self, other: object) -> bool:
+        """
+         Compare two : class : ` Event ` for equality. This is used to implement __eq__ as part of the equality operator and should not be used in general.
+
+         @param other - The object to compare with. It must be an instance of : class : ` Event `.
+
+         @return True if equal False otherwise. >>> event. __eq__ ( event ) Traceback ( most recent call last ) : TypeError : operator not supported between instances of
+        """
+        # Returns True if the two events are equal.
+        if isinstance(other, Event):
+            return (
+                    self.timestamp == other.timestamp
+                    and self.duration == other.duration
+                    and self.data == other.data
+            )
+        else:
+            raise TypeError(
+                "operator not supported between instances of '{}' and '{}'".format(
+                    type(self), type(other)
+                )
+            )
+
     def __init__(
-        self,
-        id: Optional[Id] = None,
-        timestamp: Optional[ConvertibleTimestamp] = None,
-        duration: Duration = 0,
-        data: Data = dict(),
-        server_sync_status: server_sync_status = 0
+            self,
+            id: Optional[Id] = None,
+            timestamp: Optional[ConvertibleTimestamp] = None,
+            duration: Duration = 0,
+            data: Data = dict(),
+            app: app = '',
+            title: title = '',
+            url: url = '',
+            application_name: application_name = '',
+            server_sync_status: server_sync_status = 0
     ) -> None:
         """
          Initialize an event with the given id timestamp duration and data. This is the constructor for Event objects that do not need to be called directly.
@@ -83,29 +113,15 @@ class Event(dict):
             self.timestamp = _timestamp_parse(timestamp)
         self.duration = duration  # type: ignore
         self.data = data
-        self.server_sync_status = server_sync_status
-
-    def __eq__(self, other: object) -> bool:
-        """
-         Compare two : class : ` Event ` for equality. This is used to implement __eq__ as part of the equality operator and should not be used in general.
-
-         @param other - The object to compare with. It must be an instance of : class : ` Event `.
-
-         @return True if equal False otherwise. >>> event. __eq__ ( event ) Traceback ( most recent call last ) : TypeError : operator not supported between instances of
-        """
-        # Returns True if the two events are equal.
-        if isinstance(other, Event):
-            return (
-                self.timestamp == other.timestamp
-                and self.duration == other.duration
-                and self.data == other.data
-            )
+        self.app = data.get('app', '')
+        self.title = data.get('title', '')
+        self.url = data.get('url', '')
+        if self.url == "":
+            app_name = data.get('app')
         else:
-            raise TypeError(
-                "operator not supported between instances of '{}' and '{}'".format(
-                    type(self), type(other)
-                )
-            )
+            app_name = tldextract.extract(self.url).domain
+        self.application_name = app_name
+        self.server_sync_status = server_sync_status
 
     def __lt__(self, other: object) -> bool:
         """
