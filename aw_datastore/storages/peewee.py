@@ -640,6 +640,8 @@ class PeeweeStorage(AbstractStorage):
         """
         e = EventModel.from_event(self.bucket_keys[bucket_id], event)
         e.server_sync_status = 0
+        if not e.url:
+            e.url = ''
         e.save()
         event.id = e.id
         return event
@@ -719,12 +721,15 @@ class PeeweeStorage(AbstractStorage):
                         'start', STRFTIME('%Y-%m-%dT%H:%M:%SZ', timestamp),
                         'end', STRFTIME('%Y-%m-%dT%H:%M:%SZ', DATETIME(timestamp, '+' || duration || ' seconds')),
                         'event_id', id,
-                        'title', JSON_EXTRACT(datastr, '$.title'),
                         'duration', duration,
                         'timestamp', timestamp,
                         'data', JSON(CAST(datastr AS TEXT)),
                         'id', id,
-                        'bucket_id', bucket_id
+                        'bucket_id', bucket_id,
+                        'application_name',application_name,
+                        'app',app,
+                        'title',title,
+                        'url',url
                     )
                 ) AS formatted_events
             FROM
@@ -814,21 +819,21 @@ class PeeweeStorage(AbstractStorage):
         # Define the raw SQL query
         raw_query = f"""
             SELECT
-                JSON_EXTRACT(datastr, '$.app') AS app_name,
+                application_name AS app_name,
                 STRFTIME('%H', TIME(STRFTIME('%s', '00:00:00') + SUM(duration), 'unixepoch')) AS total_hours,
                 STRFTIME('%M', TIME(STRFTIME('%s', '00:00:00') + SUM(duration), 'unixepoch')) AS total_minutes,
                 STRFTIME('%S', TIME(STRFTIME('%s', '00:00:00') + SUM(duration), 'unixepoch')) AS total_seconds,
-                SUM(duration) AS total_duration
+                SUM(duration) AS total_duration,
+                url AS url
             FROM
                 eventmodel
             WHERE
                 timestamp >= '{starttime}'
                 AND timestamp <= '{endtime}'
                 AND duration > 30
-                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%afk%'
-                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
-                AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
-                AND IFNULL(JSON_EXTRACT(datastr, '$.app'), '') NOT LIKE '%afk%'
+                AND app NOT LIKE '%afk%'
+                AND app NOT LIKE '%LockApp%'
+                AND app NOT LIKE '%loginwindow%'
             GROUP BY
                 app_name;
         """
@@ -841,7 +846,8 @@ class PeeweeStorage(AbstractStorage):
 
         # Create a list of dictionaries in the desired format
         formatted_results = [{'app': row[0], 'totalHours': row[1], 'totalMinutes': row[2], 'totalSeconds': row[3],
-                              'totalDuration': row[4]} for row in rows]
+                              'totalDuration': row[4],
+                              'url': row[5]} for row in rows]
 
         # Fetch the results
         return formatted_results
