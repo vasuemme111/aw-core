@@ -79,7 +79,7 @@ class Datastore:
 
         return self.bucket_instances[bucket_id]
 
-    def save_settings(self, settings_id, settings_dict) -> None:
+    def save_settings(self,code, value) -> None:
         """
          Save settings to storage. This is a low - level method to be used by subclasses when they want to save a set of settings that have been loaded from a file or a configuration file.
 
@@ -88,9 +88,9 @@ class Datastore:
 
          @return True if successful False otherwise. Raises : py : exc : ` ~errbot. backends. base. BackendError ` if there is a problem
         """
-        self.storage_strategy.save_settings(settings_id, settings_dict)
+        self.storage_strategy.save_settings(code, value)
 
-    def retrieve_settings(self, settings_id) -> dict:
+    def retrieve_settings(self, code) -> dict:
         """
          Retrieves settings from the storage strategy. This is a low - level method to be used by subclasses that need to retrieve settings from their own storage strategy
 
@@ -98,7 +98,7 @@ class Datastore:
 
          @return dict of settings or None if not found or could not be retrieved from the storage strategy for any reason
         """
-        return self.storage_strategy.retrieve_settings(settings_id)
+        return self.storage_strategy.retrieve_settings(code)
 
     def save_application_details(self, application_details):
         return self.storage_strategy.save_application_details(application_details=application_details)

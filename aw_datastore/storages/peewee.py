@@ -209,10 +209,10 @@ class EventModel(BaseModel):
             timestamp=event.timestamp,
             duration=event.duration.total_seconds(),
             datastr=json.dumps(event.data),
-            app=json.dumps(event.data.get('app', '')),
-            title=json.dumps(event.data.get('title', '')),
-            url=json.dumps(event.data.get('url', '')),
-            application_name=json.dumps(app_name),
+            app=event.data.get('app', ''),
+            title=event.data.get('title', ''),
+            url=event.data.get('url', ''),
+            application_name=app_name,
             server_sync_status=0
         )
 
@@ -227,10 +227,10 @@ class EventModel(BaseModel):
             "timestamp": self.timestamp,
             "duration": float(self.duration),
             "data": json.loads(self.datastr),
-            "app": json.loads(self.app),
-            "title": json.loads(self.title),
-            "url": json.loads(self.url),
-            "application_name": json.loads(self.application_name),
+            "app": self.app,
+            "title": self.title,
+            "url": self.url,
+            "application_name": self.application_name,
             "server_sync_status": self.server_sync_status
         }
 
@@ -277,10 +277,10 @@ class EventModel(BaseModel):
             timestamp=event.timestamp,
             duration=event.duration.total_seconds(),
             datastr=json.dumps(event.data),
-            app=json.dumps(event.data.get('app', '')),
-            title=json.dumps(event.data.get('title', '')),
-            url=json.dumps(event.data.get('url', '')),
-            application_name=json.dumps(app_name),
+            app=event.data.get('app', ''),
+            title=event.data.get('title', ''),
+            url=event.data.get('url', ''),
+            application_name=app_name,
             server_sync_status=0
         )
 
@@ -295,10 +295,10 @@ class EventModel(BaseModel):
             "timestamp": self.timestamp,
             "duration": float(self.duration),
             "data": json.loads(self.datastr),
-            "app": json.loads(self.app),
-            "title": json.loads(self.title),
-            "url": json.loads(self.url),
-            "application_name": json.loads(self.application_name),
+            "app": self.app,
+            "title": self.title,
+            "url": self.url,
+            "application_name": self.application_name,
             "server_sync_status": self.server_sync_status
         }
 
@@ -311,8 +311,8 @@ class SettingsModel(BaseModel):
     @classmethod
     def from_settings(cls, code, value):
         return cls(
-            code=json.dumps(code),
-            value=json.dumps(value)
+            code=code,
+            value=value,
         )
 
     def json(self):
@@ -322,8 +322,8 @@ class SettingsModel(BaseModel):
         """
         return {
             "id": self.id,
-            "code": json.loads(self.code),
-            "value": json.loads(self.value)
+            "code": self.code,
+            "value": self.value,
 
         }
 
@@ -345,21 +345,21 @@ class ApplicationModel(BaseModel):
         if existing_instance is None:
             current_time = datetime.now()
             return cls(
-                type=json.dumps(application_details.get("type", "")),
-                name=json.dumps(application_details.get("name", "")),
-                alias=json.dumps(application_details.get("alias", "")),
+                type=application_details.get("type", ""),
+                name=application_details.get("name", ""),
+                alias=application_details.get("alias", ""),
                 is_blocked=application_details.get("is_blocked", False),
                 is_ignore_idle_time=application_details.get("idle_time_ignored", False),
-                color=json.dumps(application_details.get("color", "")),
+                color=application_details.get("color", ""),
                 created_at=current_time,
                 updated_at=current_time,
             )
         else:
-            existing_instance.type = json.dumps(application_details.get("type", ""))
-            existing_instance.alias = json.dumps(application_details.get("alias", ""))
+            existing_instance.type = application_details.get("type", "")
+            existing_instance.alias = application_details.get("alias", "")
             existing_instance.is_blocked = application_details.get("is_blocked", False)
             existing_instance.is_ignore_idle_time = application_details.get("idle_time_ignored", False)
-            existing_instance.color = json.dumps(application_details.get("color", ""))
+            existing_instance.color = application_details.get("color", "")
             existing_instance.updated_at = datetime.now()
             existing_instance.save()
             return existing_instance
@@ -1107,7 +1107,7 @@ class PeeweeStorage(AbstractStorage):
         """
         try:
             settings = SettingsModel.get(SettingsModel.code == code)
-            return json.loads(settings.value)
+            return settings.value
         except SettingsModel.DoesNotExist:
             return None
 

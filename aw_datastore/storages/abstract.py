@@ -232,7 +232,7 @@ class AbstractStorage(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def save_settings(self, settings_id, settings_dict) -> None:
+    def save_settings(self, code, value) -> None:
         """
          Save settings to the storage. This is called by : meth : ` ~settings_store ` to allow the user to save a set of settings for an object or a set of objects that are stored in the storage.
 
@@ -244,7 +244,7 @@ class AbstractStorage(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def retrieve_settings(self, settings_id) -> dict:
+    def retrieve_settings(self, code) -> dict:
         """
          Retrieve settings from the storage. This is a low - level method that should be implemented by sub - classes.
 
