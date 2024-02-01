@@ -118,10 +118,12 @@ class Event(dict):
         self.url = data.get('url', '')
         if not self.url:
             app_name = self.app
-            if ".exe" in app_name.lower():
-                app_name = re.sub(r'\.exe$', '', app_name)
         else:
             app_name = tldextract.extract(self.url).domain
+        if not app_name:
+            app_name = self.app
+        if ".exe" in app_name.lower():
+            app_name = re.sub(r'\.exe$', '', app_name)
         self.application_name = app_name
         self.server_sync_status = server_sync_status
 
