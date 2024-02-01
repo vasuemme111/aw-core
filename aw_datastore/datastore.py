@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 
 class Datastore:
     def __init__(
-        self,
-        storage_strategy: Callable[..., AbstractStorage],
-        testing=False,
-        **kwargs,
+            self,
+            storage_strategy: Callable[..., AbstractStorage],
+            testing=False,
+            **kwargs,
     ) -> None:
         """
          Initialize the datastore. This is the method that must be called in order to initialize the datastore. If you don't want to call this method you have to do it yourself.
@@ -79,7 +79,7 @@ class Datastore:
 
         return self.bucket_instances[bucket_id]
 
-    def save_settings(self,code, value) -> None:
+    def save_settings(self, code, value) -> None:
         """
          Save settings to storage. This is a low - level method to be used by subclasses when they want to save a set of settings that have been loaded from a file or a configuration file.
 
@@ -102,17 +102,25 @@ class Datastore:
 
     def save_application_details(self, application_details):
         return self.storage_strategy.save_application_details(application_details=application_details)
+
     def retrieve_application_details(self) -> dict:
         return self.storage_strategy.retrieve_application_details()
+
+    def retrieve_date(self) -> datetime:
+        return self.storage_strategy.retrieve_date()
+
+    def save_date(self):
+        return self.storage_strategy.save_date()
+
     def create_bucket(
-        self,
-        bucket_id: str,
-        type: str,
-        client: str,
-        hostname: str,
-        created: datetime = datetime.now(timezone.utc),
-        name: Optional[str] = None,
-        data: Optional[dict] = None,
+            self,
+            bucket_id: str,
+            type: str,
+            client: str,
+            hostname: str,
+            created: datetime = datetime.now(timezone.utc),
+            name: Optional[str] = None,
+            data: Optional[dict] = None,
     ) -> "Bucket":
         """
          Create a bucket. This will be used by : meth : ` ~flask. Bucket. create `
@@ -220,10 +228,10 @@ class Bucket:
         return self.ds.storage_strategy.get_metadata(self.bucket_id)
 
     def get(
-        self,
-        limit: int = -1,
-        starttime: Optional[datetime] = None,
-        endtime: Optional[datetime] = None,
+            self,
+            limit: int = -1,
+            starttime: Optional[datetime] = None,
+            endtime: Optional[datetime] = None,
     ) -> List[Event]:
         """
          Get events from the storage strategy. This is a low - level method to be used by clients who don't need to worry about time handling.
@@ -248,8 +256,8 @@ class Bucket:
             milliseconds = 1 + int(endtime.microsecond / 1000)
             second_offset = int(milliseconds / 1000)  # usually 0, rarely 1
             microseconds = (
-                1000 * milliseconds
-            ) % 1000000  # will likely just be 1000 * milliseconds, if it overflows it would become zero
+                                   1000 * milliseconds
+                           ) % 1000000  # will likely just be 1000 * milliseconds, if it overflows it would become zero
             endtime = endtime.replace(microsecond=microseconds) + timedelta(
                 seconds=second_offset
             )
@@ -270,7 +278,7 @@ class Bucket:
         return self.ds.storage_strategy.get_event(self.bucket_id, event_id)
 
     def get_eventcount(
-        self, starttime: Optional[datetime] = None, endtime: Optional[datetime] = None
+            self, starttime: Optional[datetime] = None, endtime: Optional[datetime] = None
     ) -> int:
         """
          Get the number of events in this bucket. This is a wrapper around StorageStrategy. get_eventcount

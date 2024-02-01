@@ -260,6 +260,12 @@ class AbstractStorage(metaclass=ABCMeta):
     def retrieve_application_details(self) -> dict:
         raise NotImplementedError
 
+    def save_date(self):
+        raise NotImplementedError
+
+    def retrieve_date(self) -> datetime:
+        raise NotImplementedError
+
     @abstractmethod
     def get_most_used_apps(self, starttime, endtime) -> []:
         """

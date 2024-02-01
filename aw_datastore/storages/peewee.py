@@ -10,8 +10,9 @@ from typing import (
     Optional,
 )
 import re
-# Creates and returns a node list for the current module. This is a bit tricky because we don't want to create a DLL and the SQLCipher libraries are in the same directory as the module
 import ctypes
+
+import pytz
 import tldextract
 from playhouse.shortcuts import model_to_dict
 
@@ -42,6 +43,7 @@ from peewee import (
     DateTimeField,
     DecimalField,
     BooleanField,
+    TextField,
     ForeignKeyField,
     IntegerField,
     Model,
@@ -246,9 +248,9 @@ class EventModel(BaseModel):
     duration = DecimalField()
     datastr = CharField()
     app = CharField()
-    title = CharField()
-    url = CharField()
-    application_name = CharField()
+    title = TextField(null=True)
+    url = TextField(null=True)
+    application_name = CharField(max_length=50)
     server_sync_status = IntegerField(default=0)
 
     @classmethod
@@ -1154,3 +1156,19 @@ class PeeweeStorage(AbstractStorage):
             return application_details if application_details else None
         except ApplicationModel.DoesNotExist:
             return None
+
+    # def save_date(self):
+    #     settings, created = SettingsModel.get_or_create(code="System Date",
+    #                                                     defaults={'value': datetime.now().date()})
+    #     stored_date = datetime.strptime(SettingsModel.get(SettingsModel.code == "System Date").value, "%Y-%m-%d").date()
+    #     if not created:
+    #         # If the settings object already exists, update the code and value
+    #         settings.code = "System Date"
+    #         if datetime.now().date() > stored_date:
+    #             settings.value = datetime.now(pytz.UTC).date()
+    #             settings.save()  # Save the changes to the database
+    #         else:
+    #             logger.info("Date has been changed")
+    #
+    # def retrieve_date(self):
+    #     return datetime.strptime(SettingsModel.get(SettingsModel.code == "System Date").value, "%Y-%m-%d").date()
