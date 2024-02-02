@@ -782,7 +782,8 @@ class PeeweeStorage(AbstractStorage):
                         'timestamp', timestamp,
                         'data', JSON(CAST(datastr AS TEXT)),
                         'id', id,
-                        'bucket_id', bucket_id
+                        'bucket_id', bucket_id,
+                        'application_name', application_name
                     )
                 ) AS formatted_events
             FROM
