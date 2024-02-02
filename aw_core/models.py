@@ -124,6 +124,10 @@ class Event(dict):
             app_name = self.app
         if ".exe" in app_name.lower():
             app_name = re.sub(r'\.exe$', '', app_name)
+        if "localhost" in app_name or "10" in app_name or "14" in app_name or "ApplicationFrameHost" in app_name or "Code" in app_name:
+            titles = re.split(r'\s-\s|\s\|\s', self.title)
+            if titles and isinstance(titles, list):
+                app_name = titles[-2] if len(titles) > 1 else titles[-1]
         self.application_name = app_name
         self.server_sync_status = server_sync_status
 
