@@ -28,7 +28,7 @@ elif sys.platform == "darwin":
     openssl = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
     libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
 
-from aw_core.util import decrypt_uuid, load_key, start_all_module, stop_all_module
+from aw_core.util import decrypt_uuid, get_domain, load_key, start_all_module, stop_all_module
 import keyring
 import iso8601
 from aw_core.dirs import get_data_dir
@@ -269,7 +269,7 @@ class EventModel(BaseModel):
             if ".exe" in app_name.lower():
                 app_name = re.sub(r'\.exe$', '', app_name)
         else:
-            app_name = tldextract.extract(event.data.get('url', '')).domain
+            app_name = get_domain(event.data.get('url', ''))
         if ".exe" in app_name.lower():
             app_name = re.sub(r'\.exe$', '', app_name)
         if "localhost" in app_name or "10" in app_name or "14" in app_name or "ApplicationFrameHost" in app_name or "Code" in app_name:
@@ -460,7 +460,6 @@ class PeeweeStorage(AbstractStorage):
             if not filepath:
                 filename = (
                         "peewee-sqlite"
-                        + ("-testing" if testing else "")
                         + f"-{user_email}"
                         + f".v{LATEST_VERSION}"
                         + ".db"
