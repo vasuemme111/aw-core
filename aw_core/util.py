@@ -287,6 +287,6 @@ def get_domain(url):
     domain_parts = parts[0].split(".")
 
     if len(domain_parts) > 1:
-        return domain_parts[0]
+        return f'{domain_parts[0]} - {domain_parts[1]}'
     else:
         return parts[0]

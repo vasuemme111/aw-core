@@ -272,10 +272,14 @@ class EventModel(BaseModel):
             app_name = get_domain(event.data.get('url', ''))
         if ".exe" in app_name.lower():
             app_name = re.sub(r'\.exe$', '', app_name)
-        if "localhost" in app_name or "10" in app_name or "14" in app_name or "ApplicationFrameHost" in app_name or "Code" in app_name:
+        if "ApplicationFrameHost" in app_name or "Code" in app_name:
             titles = re.split(r'\s-\s|\s\|\s', event.title)
             if titles and isinstance(titles, list):
                 app_name = titles[-2] if len(titles) > 1 else titles[-1]
+        if "localhost" in app_name or "10" in app_name or "14" in app_name:
+            titles = re.split(r'\s—\s|\s-\s|\s\|\s', event.title)
+            if titles and isinstance(titles, list):
+                app_name = titles[0]
 
         return cls(
             bucket=bucket_key,
@@ -499,7 +503,7 @@ class PeeweeStorage(AbstractStorage):
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
-            start_all_module()
+            # start_all_module()
 
             return True
 
