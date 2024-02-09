@@ -120,7 +120,15 @@ class Event(dict):
         if not self.url:
             app_name = self.app
         else:
-            app_name = get_domain(self.url)
+            if "sharepoint.com" in self.url:
+                if "/:p:/" in self.url:
+                    app_name = "MSPowerPoint"
+                elif "/:x:/" in self.url:
+                    app_name = "MSExcel"
+                elif "/:w:/" in self.url:
+                    app_name = "MSWord"
+            else:
+                app_name = get_domain(self.url)
         if not app_name:
             app_name = self.app
         if ".exe" in app_name.lower():

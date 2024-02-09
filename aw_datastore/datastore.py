@@ -203,6 +203,9 @@ class Datastore:
     def update_server_sync_status(self, list_of_ids, new_status):
         return self.storage_strategy.update_server_sync_status(list_of_ids, new_status)
 
+    def get_last_event_by_app_title_pulsetime(self, app, title):
+        return self.storage_strategy.get_last_event_by_app_title_pulsetime(app, title)
+
 
 class Bucket:
     def __init__(self, datastore: Datastore, bucket_id: str) -> None:

@@ -1,3 +1,4 @@
+from decimal import Decimal
 import json
 import logging
 import os
@@ -269,7 +270,18 @@ class EventModel(BaseModel):
             if ".exe" in app_name.lower():
                 app_name = re.sub(r'\.exe$', '', app_name)
         else:
-            app_name = get_domain(event.data.get('url', ''))
+            url = event.data.get('url', '')
+            if "sharepoint.com" in url:
+                if "/:p:/" in url:
+                    app_name = "MSPowerPoint"
+                elif "/:x:/" in url:
+                    app_name = "MSExcel"
+                elif "/:w:/" in url:
+                    app_name = "MSWord"
+            else:
+                app_name = get_domain(url)
+
+
         if ".exe" in app_name.lower():
             app_name = re.sub(r'\.exe$', '', app_name)
         if "ApplicationFrameHost" in app_name or "Code" in app_name:
@@ -503,7 +515,7 @@ class PeeweeStorage(AbstractStorage):
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
-            # start_all_module()
+            start_all_module()
 
             return True
 
@@ -650,12 +662,24 @@ class PeeweeStorage(AbstractStorage):
          @return The newly inserted event. Note that you must call save () on the event before you call this
         """
         e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-        e.server_sync_status = 0
-        if not e.url:
-            e.url = ''
-        e.save()
-        event.id = e.id
-        return event
+        is_exist = self._get_last_event_by_app_title_pulsetime(app = event.application_name, title = event.title)
+        if 'afk' not in event.application_name and is_exist:
+            # logger.info(f'event app: {event.application_name} title: {event.title}')
+            logger.info(f'befor app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
+            is_exist.duration += Decimal(str(e.duration))
+            is_exist.server_sync_status = 0  # Convert e.duration to Decimal before addition
+            # logger.info(f'after app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
+            is_exist.save()
+            event.id = is_exist.id
+            event.duration = float(is_exist.duration)
+            return event
+        else:
+            e.server_sync_status = 0
+            if not e.url:
+                e.url = ''
+            e.save()
+            event.id = e.id
+            return event
 
     def insert_many(self, bucket_id, events: List[Event]) -> None:
         """
@@ -879,6 +903,27 @@ class PeeweeStorage(AbstractStorage):
             .get()
         )
 
+    def _get_last_event_by_app_title_pulsetime(self, app, title) -> EventModel:
+        # Define the current time and the time 60 seconds ago in UTC
+        current_time_utc = datetime.utcnow()
+        time_60_seconds_ago_utc = current_time_utc - timedelta(seconds=130)
+        return (
+            EventModel
+            .select()
+            .where((EventModel.application_name == app) & (EventModel.title == title) & (EventModel.timestamp >= time_60_seconds_ago_utc))
+            .order_by(EventModel.timestamp.desc())
+            .first()
+        )
+
+    def _get_last_event_by_app_title(self, app, title) -> EventModel:
+        return (
+            EventModel
+            .select()
+            .where((EventModel.application_name == app) & (EventModel.title == title))
+            .order_by(EventModel.timestamp.desc())
+            .first()
+        )
+
     def replace_last(self, bucket_id, event):
         """
          Replaces the last event in the bucket with the given event. This is useful for events that have been added in the middle of a batch.
@@ -888,7 +933,7 @@ class PeeweeStorage(AbstractStorage):
 
          @return The event with the latest data replaced with the given
         """
-        e = self._get_last(bucket_id)
+        e = self._get_last_event_by_app_title(event.application_name, event.title)
         e.timestamp = event.timestamp
         e.duration = event.duration.total_seconds()
         e.datastr = json.dumps(event.data)
@@ -992,6 +1037,10 @@ class PeeweeStorage(AbstractStorage):
                     e.duration = endtime - e.timestamp
 
         return events
+
+    def get_last_event_by_app_title_pulsetime(self, app, title) -> EventModel:
+        return self._get_last_event_by_app_title_pulsetime(app=app, title=title)
+
 
     def get_most_used_apps(
             self,
