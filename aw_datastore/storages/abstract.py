@@ -242,6 +242,11 @@ class AbstractStorage(metaclass=ABCMeta):
          @return True if the settings were saved False otherwise. If a value is returned it will be returned as the result of the call
         """
         raise NotImplementedError
+    def update_settings(self,code):
+        return NotImplementedError
+    
+    def delete_settings(self,code):
+        return NotImplementedError
 
     @abstractmethod
     def retrieve_settings(self, code) -> dict:
@@ -258,6 +263,10 @@ class AbstractStorage(metaclass=ABCMeta):
         raise NotImplementedError
 
     def retrieve_application_details(self) -> dict:
+        raise NotImplementedError
+    def update_application_details(self,application_name,update_detail):
+        raise NotImplementedError
+    def delete_application_details(self,application_name):
         raise NotImplementedError
 
     def save_date(self):

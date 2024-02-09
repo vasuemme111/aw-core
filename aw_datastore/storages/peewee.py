@@ -54,6 +54,7 @@ from .abstract import AbstractStorage
 from cryptography.fernet import Fernet
 import cryptocode
 import keyring
+from peewee import DoesNotExist
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +253,6 @@ class EventModel(BaseModel):
     url = TextField(null=True)
     application_name = CharField(max_length=50)
     server_sync_status = IntegerField(default=0)
-
     @classmethod
     def from_event(cls, bucket_key, event: Event):
         """
@@ -262,37 +262,55 @@ class EventModel(BaseModel):
         @param bucket_key - The key of the bucket to use for the new event.
         @param event - The event to create the event from. Must have a non-empty Event attribute.
 
-        @return The newly created EventModel instance
+        @return The newly created EventModel instance or None if conditions are not met
         """
-        if not event.data.get('url'):
-            app_name = event.data.get('app', '')
+        if cls is not None:
+            # logger.info("Creating EventModel from event: %s", event)
+            
+            if not event.data.get('url'):
+                app_name = event.data.get('app', '')
+                if ".exe" in app_name.lower():
+                    app_name = re.sub(r'\.exe$', '', app_name)
+            else:
+                app_name = get_domain(event.data.get('url', ''))
             if ".exe" in app_name.lower():
                 app_name = re.sub(r'\.exe$', '', app_name)
+            if "localhost" in app_name or "10" in app_name or "14" in app_name or "ApplicationFrameHost" in app_name or "Code" in app_name:
+                titles = re.split(r'\s-\s|\s\|\s', event.title)
+                if titles and isinstance(titles, list):
+                    app_name = titles[-2] if len(titles) > 1 else titles[-1]
+            title_name = event.data.get('title')
+            application_name = event.data.get('app')
+            # logger.info("Title: %s, Application: %s", title_name, application_name)
+            
+            if application_name != '' and title_name != '':
+                try:
+                    event_model = cls(
+                        bucket=bucket_key,
+                        id=event.id,
+                        timestamp=event.timestamp,
+                        duration=event.duration.total_seconds(),
+                        datastr=json.dumps(event.data),
+                        app=event.data.get('app', ''),
+                        title=event.data.get('title', ''),
+                        url=event.data.get('url', ''),
+                        application_name=app_name,
+                        server_sync_status=cls.server_sync_status or 0
+                    )
+                    # logger.info("EventModel created successfully")
+                    return event_model
+                except ValueError as ve:
+                    logger.warning("Vallue Error raised events not inserted: %s",str(ve))
+                    return None  # Return None explicitly in case of an exception
+                except AttributeError as ae:
+                    logger.warning("AttributeError: %s", str(ae))
+                    return None
+            else:
+                logger.warning("Application name or title is empty, returning None")
+                return None  # Return None if conditions are not met
         else:
-            app_name = get_domain(event.data.get('url', ''))
-        if ".exe" in app_name.lower():
-            app_name = re.sub(r'\.exe$', '', app_name)
-        if "ApplicationFrameHost" in app_name or "Code" in app_name:
-            titles = re.split(r'\s-\s|\s\|\s', event.title)
-            if titles and isinstance(titles, list):
-                app_name = titles[-2] if len(titles) > 1 else titles[-1]
-        if "localhost" in app_name or "10" in app_name or "14" in app_name:
-            titles = re.split(r'\s—\s|\s-\s|\s\|\s', event.title)
-            if titles and isinstance(titles, list):
-                app_name = titles[0]
+            logger.warning("cls object is none")
 
-        return cls(
-            bucket=bucket_key,
-            id=event.id,
-            timestamp=event.timestamp,
-            duration=event.duration.total_seconds(),
-            datastr=json.dumps(event.data),
-            app=event.data.get('app', ''),
-            title=event.data.get('title', ''),
-            url=event.data.get('url', ''),
-            application_name=app_name,
-            server_sync_status=0
-        )
 
     def json(self):
         """
@@ -453,7 +471,6 @@ class PeeweeStorage(AbstractStorage):
         else:
             password = decrypt_uuid(db_key, key)
             user_email = cached_credentials.get("email")
-
             # Return true if password is not password
             if not password:
                 return False
@@ -503,7 +520,7 @@ class PeeweeStorage(AbstractStorage):
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
-            # start_all_module()
+            start_all_module()
 
             return True
 
@@ -649,13 +666,17 @@ class PeeweeStorage(AbstractStorage):
 
          @return The newly inserted event. Note that you must call save () on the event before you call this
         """
-        e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-        e.server_sync_status = 0
-        if not e.url:
-            e.url = ''
-        e.save()
-        event.id = e.id
-        return event
+        # e = EventModel.from_event(self.bucket_keys[bucket_id], event)
+        if event.data['title']!='':
+            e = EventModel.from_event(self.bucket_keys[bucket_id], event)
+            e.server_sync_status = 0
+            if not e.url:
+                e.url = ''
+            e.save()
+            event.id = e.id
+            return event
+        else:
+            logger.warning("None Type object has no server_sync_status attribut or Title were empty for this event")
 
     def insert_many(self, bucket_id, events: List[Event]) -> None:
         """
@@ -978,7 +999,6 @@ class PeeweeStorage(AbstractStorage):
 
         res = q.execute()
         events = [Event(**e) for e in list(map(EventModel.json, res))]
-
         # Trim events that are out of range (as done in aw-server-rust)
         # TODO: Do the same for the other storage methods
         for e in events:
@@ -1124,8 +1144,56 @@ class PeeweeStorage(AbstractStorage):
         try:
             settings = SettingsModel.get(SettingsModel.code == code)
             return settings.value
-        except SettingsModel.DoesNotExist:
+        except DoesNotExist:
             return None
+    def update_settings(self, code, value):
+        """
+        Update settings in the database.
+        :param code: The code associated with the settings to be updated.
+        :param value: The new value of the settings.
+        :return: The updated settings object if successful, None otherwise.
+        """
+        try:
+            # Attempt to retrieve the settings object by code
+            settings = SettingsModel.get_or_none(code=code)
+            if settings:
+                # Update the value of the settings
+                settings.value = value
+                settings.save()  # Save the changes to the database
+                return settings  # Return the updated settings object
+            else:
+                logger.warning(f"No settings found with code '{code}'")
+                return None
+        except peewee.IntegrityError as e:
+            logger.error(f"Integrity error while updating settings: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred while updating settings: {e}")
+            raise
+
+    def delete_settings(self, code):
+        """
+        Delete settings from the database.
+        :param code: The code associated with the settings to be deleted.
+        :return: True if deletion is successful, False otherwise.
+        """
+        try:
+            # Attempt to retrieve the settings object by code
+            settings = SettingsModel.get_or_none(code=code)
+            if settings:
+                # Delete the settings object
+                settings.delete_instance()
+                return True  # Deletion successful
+            else:
+                logger.warning(f"No settings found with code '{code}'")
+                return False  # No settings found for deletion
+        except peewee.IntegrityError as e:
+            logger.error(f"Integrity error while deleting settings: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred while deleting settings: {e}")
+            raise
+
 
     def save_application_details(self, application_details):
         """
@@ -1136,7 +1204,7 @@ class PeeweeStorage(AbstractStorage):
         try:
             # Attempt to retrieve an existing application object or create a new one if it doesn't exist
             application, created = ApplicationModel.get_or_create(name=application_details['name'],
-                                                                  defaults=application_details)
+                                                                defaults=application_details)
 
             if not created:
                 # If the application object already exists, update its details
@@ -1170,9 +1238,38 @@ class PeeweeStorage(AbstractStorage):
                         app_detail[key] = value.strftime('%Y-%m-%d %H:%M:%S')
 
             return application_details if application_details else None
-        except ApplicationModel.DoesNotExist:
+        except DoesNotExist:
             return None
-
+        
+    def update_application_details(self, application_id, update_details):
+        try:
+            existing_instance = ApplicationModel.get_or_none(id=application_id)
+            if existing_instance:
+                for field, value in update_details.items():
+                    if hasattr(ApplicationModel, field):
+                        setattr(existing_instance, field, value)
+                existing_instance.updated_at = datetime.now()
+                existing_instance.save()
+                return existing_instance  # Return the updated instance
+            else:
+                logger.warning("No application found with ID %s", application_id)
+                return None
+        except Exception as e:
+            logger.error("Error updating application details: %s", e)
+            return None
+        
+    def delete_application_details(self,application_id):
+        try:
+            existing_instance = ApplicationModel.get_or_none(id=application_id)
+            if existing_instance:
+                existing_instance.delete_instance()
+                return existing_instance
+            else:
+                # Handle the case where the instance with the provided name doesn't exist
+                return None    
+        except DoesNotExist:
+            # Handle the case where the instance with the provided name doesn't exist
+            return None
     # def save_date(self):
     #     settings, created = SettingsModel.get_or_create(code="System Date",
     #                                                     defaults={'value': datetime.now().date()})

@@ -88,7 +88,13 @@ class Datastore:
 
          @return True if successful False otherwise. Raises : py : exc : ` ~errbot. backends. base. BackendError ` if there is a problem
         """
-        self.storage_strategy.save_settings(code, value)
+        return self.storage_strategy.save_settings(code, value)
+    
+    def update_settings(self,code,value):
+        return self.storage_strategy.update_settings(code,value)
+    
+    def delete_settings(self,code):
+        return self.storage_strategy.delete_settings(code)
 
     def retrieve_settings(self, code) -> dict:
         """
@@ -105,6 +111,12 @@ class Datastore:
 
     def retrieve_application_details(self) -> dict:
         return self.storage_strategy.retrieve_application_details()
+    def update_application_details(self,application_name,update_detail):
+        return self.storage_strategy.update_application_details(application_name,update_detail)
+    
+    
+    def delete_application_details(self,application_id):
+        return self.storage_strategy.delete_application_details(application_id)
 
     def retrieve_date(self) -> datetime:
         return self.storage_strategy.retrieve_date()
