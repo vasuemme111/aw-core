@@ -273,13 +273,28 @@ class EventModel(BaseModel):
                 if ".exe" in app_name.lower():
                     app_name = re.sub(r'\.exe$', '', app_name)
             else:
-                app_name = get_domain(event.data.get('url', ''))
+                url = event.data.get('url', '')
+                if "sharepoint.com" in url:
+                    if "/:p:/" in url:
+                        app_name = "MSPowerPoint"
+                    elif "/:x:/" in url:
+                        app_name = "MSExcel"
+                    elif "/:w:/" in url:
+                        app_name = "MSWord"
+                else:
+                    app_name = get_domain(url)
+
+
             if ".exe" in app_name.lower():
                 app_name = re.sub(r'\.exe$', '', app_name)
-            if "localhost" in app_name or "10" in app_name or "14" in app_name or "ApplicationFrameHost" in app_name or "Code" in app_name:
+            if "ApplicationFrameHost" in app_name or "Code" in app_name:
                 titles = re.split(r'\s-\s|\s\|\s', event.title)
                 if titles and isinstance(titles, list):
                     app_name = titles[-2] if len(titles) > 1 else titles[-1]
+            if "localhost" in app_name or "10" in app_name or "14" in app_name:
+                titles = re.split(r'\s—\s|\s-\s|\s\|\s', event.title)
+                if titles and isinstance(titles, list):
+                    app_name = titles[0]
             title_name = event.data.get('title')
             application_name = event.data.get('app')
             # logger.info("Title: %s, Application: %s", title_name, application_name)
@@ -311,34 +326,6 @@ class EventModel(BaseModel):
                 return None  # Return None if conditions are not met
         else:
             logger.warning("cls object is none")
-
-        if not event.data.get('url'):
-            app_name = event.data.get('app', '')
-            if ".exe" in app_name.lower():
-                app_name = re.sub(r'\.exe$', '', app_name)
-        else:
-            url = event.data.get('url', '')
-            if "sharepoint.com" in url:
-                if "/:p:/" in url:
-                    app_name = "MSPowerPoint"
-                elif "/:x:/" in url:
-                    app_name = "MSExcel"
-                elif "/:w:/" in url:
-                    app_name = "MSWord"
-            else:
-                app_name = get_domain(url)
-
-
-        if ".exe" in app_name.lower():
-            app_name = re.sub(r'\.exe$', '', app_name)
-        if "ApplicationFrameHost" in app_name or "Code" in app_name:
-            titles = re.split(r'\s-\s|\s\|\s', event.title)
-            if titles and isinstance(titles, list):
-                app_name = titles[-2] if len(titles) > 1 else titles[-1]
-        if "localhost" in app_name or "10" in app_name or "14" in app_name:
-            titles = re.split(r'\s—\s|\s-\s|\s\|\s', event.title)
-            if titles and isinstance(titles, list):
-                app_name = titles[0]
 
         return cls(
             bucket=bucket_key,
@@ -562,7 +549,6 @@ class PeeweeStorage(AbstractStorage):
             if database_changed:
                 stop_all_module()
             start_all_module()
-            start_all_module()
 
             return True
 
@@ -709,35 +695,29 @@ class PeeweeStorage(AbstractStorage):
          @return The newly inserted event. Note that you must call save () on the event before you call this
         """
         # e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-        if event.data['title']!='':
+        if event.data['title']!='' and event.data['app']!='':
             e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-            e.server_sync_status = 0
-            if not e.url:
-                e.url = ''
-            e.save()
-            event.id = e.id
-            return event
+            is_exist = self._get_last_event_by_app_title_pulsetime(app = event.application_name, title = event.title)
+            if 'afk' not in event.application_name and is_exist:
+                # logger.info(f'event app: {event.application_name} title: {event.title}')
+                logger.info(f'befor app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
+                is_exist.duration += Decimal(str(e.duration))
+                is_exist.server_sync_status = 0  # Convert e.duration to Decimal before addition
+                # logger.info(f'after app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
+                is_exist.save()
+                event.id = is_exist.id
+                event.duration = float(is_exist.duration)
+                return event
+            else:
+                e.server_sync_status = 0
+                if not e.url:
+                    e.url = ''
+                e.save()
+                event.id = e.id
+                return event
         else:
             logger.warning("None Type object has no server_sync_status attribut or Title were empty for this event")
-        e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-        is_exist = self._get_last_event_by_app_title_pulsetime(app = event.application_name, title = event.title)
-        if 'afk' not in event.application_name and is_exist:
-            # logger.info(f'event app: {event.application_name} title: {event.title}')
-            logger.info(f'befor app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
-            is_exist.duration += Decimal(str(e.duration))
-            is_exist.server_sync_status = 0  # Convert e.duration to Decimal before addition
-            # logger.info(f'after app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
-            is_exist.save()
-            event.id = is_exist.id
-            event.duration = float(is_exist.duration)
-            return event
-        else:
-            e.server_sync_status = 0
-            if not e.url:
-                e.url = ''
-            e.save()
-            event.id = e.id
-            return event
+
 
     def insert_many(self, bucket_id, events: List[Event]) -> None:
         """
