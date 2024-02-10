@@ -117,6 +117,7 @@ class Event(dict):
         self.app = data.get('app', '')
         self.title = data.get('title', '')
         self.url = data.get('url', '')
+        app_name = None
         if not self.url:
             app_name = self.app
         else:

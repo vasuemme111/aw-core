@@ -268,6 +268,7 @@ class EventModel(BaseModel):
         if cls is not None:
             # logger.info("Creating EventModel from event: %s", event)
 
+            app_name = None
             if not event.data.get('url'):
                 app_name = event.data.get('app', '')
                 if ".exe" in app_name.lower():
@@ -944,7 +945,7 @@ class PeeweeStorage(AbstractStorage):
     def _get_last_event_by_app_title_pulsetime(self, app, title) -> EventModel:
         # Define the current time and the time 60 seconds ago in UTC
         current_time_utc = datetime.utcnow()
-        time_60_seconds_ago_utc = current_time_utc - timedelta(seconds=130)
+        time_60_seconds_ago_utc = current_time_utc - timedelta(seconds=70)
         return (
             EventModel
             .select()
