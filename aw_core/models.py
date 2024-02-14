@@ -125,11 +125,11 @@ class Event(dict):
             app_name = get_domain(self.url)
             if "sharepoint.com" in self.url:
                 if "/:p:/" in self.url:
-                    app_name = "PowerPoint - sharepoint"
+                    app_name = "PowerPoint - oneDrive"
                 elif "/:x:/" in self.url:
-                    app_name = "Excel - sharepoint"
+                    app_name = "Excel - oneDrive"
                 elif "/:w:/" in self.url:
-                    app_name = "Word - sharepoint"
+                    app_name = "Word - oneDrive"
                 else:
                     decode_url = unquote(self.url)
                     pattern = r"Microsoft Teams Chat Files/(.*?)&parent="
@@ -138,9 +138,9 @@ class Event(dict):
                         extracted_value = match.group(1)
                         self.title = extracted_value
                         if ".txt" in extracted_value:
-                            app_name = "Text - sharepoint"
+                            app_name = "Text - oneDrive"
                         elif ".pdf" in extracted_value:
-                            app_name = "Pdf - sharepoint"
+                            app_name = "Pdf - oneDrive"
         if not app_name:
             app_name = self.app
         if ".exe" in app_name.lower():

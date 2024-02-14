@@ -281,11 +281,11 @@ class EventModel(BaseModel):
                 app_name = get_domain(url)
                 if "sharepoint.com" in url:
                     if "/:p:/" in url:
-                        app_name = "PowerPoint - sharepoint"
+                        app_name = "PowerPoint - oneDrive"
                     elif "/:x:/" in url:
-                        app_name = "Excel - sharepoint"
+                        app_name = "Excel - oneDrive"
                     elif "/:w:/" in url:
-                        app_name = "Word - sharepoint"
+                        app_name = "Word - oneDrive"
                     else:
                         decode_url = unquote(url)
                         pattern = r"Microsoft Teams Chat Files/(.*?)&parent="
@@ -294,9 +294,9 @@ class EventModel(BaseModel):
                             extracted_value = match.group(1)
                             title_name = extracted_value
                             if ".txt" in extracted_value:
-                                app_name = "Text - sharepoint"
+                                app_name = "Text - oneDrive"
                             elif ".pdf" in extracted_value:
-                                app_name = "Pdf - sharepoint"
+                                app_name = "Pdf - oneDrive"
 
 
             if ".exe" in app_name.lower():
