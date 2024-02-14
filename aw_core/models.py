@@ -137,6 +137,8 @@ class Event(dict):
                     if match:
                         extracted_value = match.group(1)
                         self.title = extracted_value
+                        data['title'] = extracted_value
+                        self.data = data
                         if ".txt" in extracted_value:
                             app_name = "Text - OneDrive"
                         elif ".pdf" in extracted_value:

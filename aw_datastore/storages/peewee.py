@@ -293,6 +293,7 @@ class EventModel(BaseModel):
                         if match:
                             extracted_value = match.group(1)
                             title_name = extracted_value
+                            event.data['title'] = extracted_value
                             if ".txt" in extracted_value:
                                 app_name = "Text - OneDrive"
                             elif ".pdf" in extracted_value:
@@ -562,7 +563,7 @@ class PeeweeStorage(AbstractStorage):
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
-            start_all_module()
+            # start_all_module()
 
             return True
 
