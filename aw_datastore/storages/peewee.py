@@ -563,7 +563,7 @@ class PeeweeStorage(AbstractStorage):
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
-            # start_all_module()
+            start_all_module()
 
             return True
 
