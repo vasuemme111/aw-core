@@ -30,7 +30,7 @@ elif sys.platform == "darwin":
     openssl = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
     libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
 
-from aw_core.util import decrypt_uuid, get_domain, load_key, start_all_module, stop_all_module
+from aw_core.util import decrypt_uuid, get_document_title, get_domain, load_key, start_all_module, stop_all_module
 import keyring
 import iso8601
 from aw_core.dirs import get_data_dir
@@ -311,8 +311,6 @@ class EventModel(BaseModel):
                 titles = re.split(r'\s—\s|\s-\s|\s\|\s', event.title)
                 if titles and isinstance(titles, list):
                     app_name = titles[0]
-            title_name = event.data.get('title')
-            application_name = event.data.get('app')
             # logger.info("Title: %s, Application: %s", title_name, application_name)
 
             if application_name != '' and title_name != '':
@@ -329,7 +327,7 @@ class EventModel(BaseModel):
                         application_name=app_name,
                         server_sync_status=cls.server_sync_status or 0
                     )
-                    # logger.info("EventModel created successfully")
+                    logger.info(f"EventModel {event_model.title}")
                     return event_model
                 except ValueError as ve:
                     logger.warning("Vallue Error raised events not inserted: %s",str(ve))
@@ -988,13 +986,18 @@ class PeeweeStorage(AbstractStorage):
 
          @return The event with the latest data replaced with the given
         """
-        e = self._get_last_event_by_app_title(event.application_name, event.title)
-        e.timestamp = event.timestamp
-        e.duration = event.duration.total_seconds()
-        e.datastr = json.dumps(event.data)
-        e.server_sync_status = 0
-        e.save()
-        event.id = e.id
+        try:
+            e = self._get_last_event_by_app_title(event.application_name, get_document_title(event=event))
+            # e.timestamp = event.timestamp
+            e.duration = event['duration'].total_seconds()
+            # e.datastr = json.dumps(event.data)
+            e.server_sync_status = 0
+            e.save()
+            event.id = e.id
+        except Exception as ef:
+            logger.error(f"replace_event error: {ef}")
+            logger.error(f"last_event error event: {e}")
+            logger.error(f"replace_event error event: {event}")
         return event
 
     def delete(self, bucket_id, event_id):
