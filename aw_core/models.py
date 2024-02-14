@@ -10,6 +10,7 @@ from typing import (
     Union,
 )
 import re
+from urllib.parse import unquote
 from aw_core.util import get_domain
 import iso8601
 from tldextract import tldextract
@@ -121,19 +122,31 @@ class Event(dict):
         if not self.url:
             app_name = self.app
         else:
+            app_name = get_domain(self.url)
             if "sharepoint.com" in self.url:
                 if "/:p:/" in self.url:
-                    app_name = "MSPowerPoint"
+                    app_name = "PowerPoint - sharepoint"
                 elif "/:x:/" in self.url:
-                    app_name = "MSExcel"
+                    app_name = "Excel - sharepoint"
                 elif "/:w:/" in self.url:
-                    app_name = "MSWord"
-            else:
-                app_name = get_domain(self.url)
+                    app_name = "Word - sharepoint"
+                else:
+                    decode_url = unquote(self.url)
+                    pattern = r"Microsoft Teams Chat Files/(.*?)&parent="
+                    match = re.search(pattern, decode_url)
+                    if match:
+                        extracted_value = match.group(1)
+                        self.title = extracted_value
+                        if ".txt" in extracted_value:
+                            app_name = "Text - sharepoint"
+                        elif ".pdf" in extracted_value:
+                            app_name = "Pdf - sharepoint"
         if not app_name:
             app_name = self.app
         if ".exe" in app_name.lower():
             app_name = re.sub(r'\.exe$', '', app_name)
+        if "explorer" in app_name:
+            app_name = self.title
         if "ApplicationFrameHost" in app_name or "Code" in app_name:
             titles = re.split(r'\s-\s|\s\|\s', self.title)
             if titles and isinstance(titles, list):

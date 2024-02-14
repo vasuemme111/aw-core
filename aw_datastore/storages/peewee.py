@@ -12,6 +12,7 @@ from typing import (
 )
 import re
 import ctypes
+from urllib.parse import unquote
 
 import pytz
 import tldextract
@@ -269,21 +270,33 @@ class EventModel(BaseModel):
             # logger.info("Creating EventModel from event: %s", event)
 
             app_name = None
+            title_name = event.data.get('title')
+            application_name = event.data.get('app')
             if not event.data.get('url'):
                 app_name = event.data.get('app', '')
                 if ".exe" in app_name.lower():
                     app_name = re.sub(r'\.exe$', '', app_name)
             else:
                 url = event.data.get('url', '')
+                app_name = get_domain(url)
                 if "sharepoint.com" in url:
                     if "/:p:/" in url:
-                        app_name = "MSPowerPoint"
+                        app_name = "PowerPoint - sharepoint"
                     elif "/:x:/" in url:
-                        app_name = "MSExcel"
+                        app_name = "Excel - sharepoint"
                     elif "/:w:/" in url:
-                        app_name = "MSWord"
-                else:
-                    app_name = get_domain(url)
+                        app_name = "Word - sharepoint"
+                    else:
+                        decode_url = unquote(url)
+                        pattern = r"Microsoft Teams Chat Files/(.*?)&parent="
+                        match = re.search(pattern, decode_url)
+                        if match:
+                            extracted_value = match.group(1)
+                            title_name = extracted_value
+                            if ".txt" in extracted_value:
+                                app_name = "Text - sharepoint"
+                            elif ".pdf" in extracted_value:
+                                app_name = "Pdf - sharepoint"
 
 
             if ".exe" in app_name.lower():
@@ -292,6 +305,8 @@ class EventModel(BaseModel):
                 titles = re.split(r'\s-\s|\s\|\s', event.title)
                 if titles and isinstance(titles, list):
                     app_name = titles[-2] if len(titles) > 1 else titles[-1]
+            if "explorer" in app_name:
+                app_name = event.title
             if "localhost" in app_name or "10" in app_name or "14" in app_name:
                 titles = re.split(r'\s—\s|\s-\s|\s\|\s', event.title)
                 if titles and isinstance(titles, list):
@@ -309,7 +324,7 @@ class EventModel(BaseModel):
                         duration=event.duration.total_seconds(),
                         datastr=json.dumps(event.data),
                         app=event.data.get('app', ''),
-                        title=event.data.get('title', ''),
+                        title=title_name,
                         url=event.data.get('url', ''),
                         application_name=app_name,
                         server_sync_status=cls.server_sync_status or 0
@@ -718,6 +733,7 @@ class PeeweeStorage(AbstractStorage):
                 return event
         else:
             logger.warning("None Type object has no server_sync_status attribut or Title were empty for this event")
+            return event
 
 
     def insert_many(self, bucket_id, events: List[Event]) -> None:
