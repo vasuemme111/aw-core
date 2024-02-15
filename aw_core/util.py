@@ -298,14 +298,6 @@ def get_domain(url):
 def get_document_title(event):
     url = event.data.get('url', '')
     title = event.data.get('title', '')
-    try:
-        if "sharepoint.com" in url:
-            decode_url = unquote(url)
-            pattern = r"Microsoft Teams Chat Files/(.*?)&parent="
-            match = re.search(pattern, decode_url)
-            if match:
-                extracted_value = match.group(1)
-                title = extracted_value
-    except Exception as ex:
-        logger.error(f'exception @ get_document_title: {ex}')
+    if "sharepoint.com" in url:
+        title = "OneDrive"
     return title

@@ -280,24 +280,7 @@ class EventModel(BaseModel):
                 url = event.data.get('url', '')
                 app_name = get_domain(url)
                 if "sharepoint.com" in url:
-                    if "/:p:/" in url:
-                        app_name = "PowerPoint - OneDrive"
-                    elif "/:x:/" in url:
-                        app_name = "Excel - OneDrive"
-                    elif "/:w:/" in url:
-                        app_name = "Word - OneDrive"
-                    else:
-                        decode_url = unquote(url)
-                        pattern = r"Microsoft Teams Chat Files/(.*?)&parent="
-                        match = re.search(pattern, decode_url)
-                        if match:
-                            extracted_value = match.group(1)
-                            title_name = extracted_value
-                            event.data['title'] = extracted_value
-                            if ".txt" in extracted_value:
-                                app_name = "Text - OneDrive"
-                            elif ".pdf" in extracted_value:
-                                app_name = "Pdf - OneDrive"
+                    app_name = "OneDrive"
 
 
             if ".exe" in app_name.lower():
@@ -978,6 +961,15 @@ class PeeweeStorage(AbstractStorage):
             .first()
         )
 
+    def _get_last_event_by_app_url(self, app, url) -> EventModel:
+        return (
+            EventModel
+            .select()
+            .where((EventModel.application_name == app) & (EventModel.url == url))
+            .order_by(EventModel.timestamp.desc())
+            .first()
+        )
+
     def replace_last(self, bucket_id, event):
         """
          Replaces the last event in the bucket with the given event. This is useful for events that have been added in the middle of a batch.
@@ -988,13 +980,18 @@ class PeeweeStorage(AbstractStorage):
          @return The event with the latest data replaced with the given
         """
         try:
-            e = self._get_last_event_by_app_title(event.application_name, get_document_title(event=event))
-            # e.timestamp = event.timestamp
-            e.duration = event['duration'].total_seconds()
-            # e.datastr = json.dumps(event.data)
-            e.server_sync_status = 0
-            e.save()
-            event.id = e.id
+            e = None
+            if event.url:
+                e = self._get_last_event_by_app_url(event.application_name, event.url)
+            else:
+                e = self._get_last_event_by_app_title(event.application_name, event.title)
+            if e:
+                # e.timestamp = event.timestamp
+                e.duration = event['duration'].total_seconds()
+                # e.datastr = json.dumps(event.data)
+                e.server_sync_status = 0
+                e.save()
+                event.id = e.id
         except Exception as ef:
             logger.error(f"replace_event error: {ef}")
             logger.error(f"last_event error event: {e}")
