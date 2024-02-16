@@ -96,7 +96,7 @@ class Datastore:
     def delete_settings(self,code):
         return self.storage_strategy.delete_settings(code)
 
-    def retrieve_settings(self, code) -> dict:
+    def retrieve_setting(self, code) -> dict:
         """
          Retrieves settings from the storage strategy. This is a low - level method to be used by subclasses that need to retrieve settings from their own storage strategy
 
@@ -104,15 +104,22 @@ class Datastore:
 
          @return dict of settings or None if not found or could not be retrieved from the storage strategy for any reason
         """
-        return self.storage_strategy.retrieve_settings(code)
+        return self.storage_strategy.retrieve_setting(code)
+
+    def retrieve_all_settings(self) -> dict:
+        return self.storage_strategy.retrieve_all_settings()
 
     def save_application_details(self, application_details):
         return self.storage_strategy.save_application_details(application_details=application_details)
 
     def retrieve_application_details(self) -> dict:
         return self.storage_strategy.retrieve_application_details()
-    def update_application_details(self,application_name,update_detail):
-        return self.storage_strategy.update_application_details(application_name,update_detail)
+
+    def retrieve_application_names(self):
+        return self.storage_strategy.retrieve_application_names()
+
+    def update_application_details(self,update_detail):
+        return self.storage_strategy.update_application_details(update_detail)
     
     
     def delete_application_details(self,application_id):

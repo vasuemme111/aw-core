@@ -3,7 +3,7 @@ import ctypes
 import re
 import sys
 from typing import Tuple
-from urllib.parse import unquote
+from aw_core import db_cache
 from aw_core.cache import *
 import logging
 from cryptography.fernet import Fernet
@@ -255,10 +255,13 @@ def start_all_module():
      Start all aw - server modules that don't have a watcher_name. This is used to ensure that we're able to listen for changes
     """
     modules = list_modules()
+    idle_time = db_cache.retrieve("settings_cache")['idle_time']
     # Start the watcher manager.
     for module in modules:
         # Start the watcher if not aw server
         if not module["watcher_name"] == "aw-server":
+            if not idle_time and module["watcher_name"] == "aw-watcher-afk":
+                continue
             manager.start(module["watcher_name"])
 
 

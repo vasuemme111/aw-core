@@ -19,6 +19,7 @@ import tldextract
 from playhouse.shortcuts import model_to_dict
 
 from aw_core.cache import cache_user_credentials
+from aw_core import db_cache
 
 if sys.platform == "win32":
     _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
@@ -72,6 +73,8 @@ db_proxy = DatabaseProxy()
 _db = None
 
 LATEST_VERSION = 2
+application_cache_key = "application_cache"
+settings_cache_key = "settings_cache"
 
 
 def auto_migrate(db: Any, path: str) -> None:
@@ -173,77 +176,6 @@ class BucketModel(BaseModel):
         }
 
 
-import platform
-
-
-class EventModel(BaseModel):
-    id = AutoField()
-    bucket = ForeignKeyField(BucketModel, backref="events", index=True)
-    timestamp = DateTimeField(index=True, default=datetime.now)
-    duration = DecimalField()
-    datastr = CharField()
-    app = CharField()
-    title = CharField()
-    url = CharField()
-    application_name = CharField()
-    server_sync_status = IntegerField(default=0)
-
-    @classmethod
-    def from_event(cls, bucket_key, event: Event):
-        """
-        Create an EventModel instance from a Cloud Pub/Sub event.
-
-        @param cls - The class to use for the new event.
-        @param bucket_key - The key of the bucket to use for the new event.
-        @param event - The event to create the event from. Must have a non-empty Event attribute.
-
-        @return The newly created EventModel instance
-        """
-        system = platform.system()
-
-        if not event.data.get('url'):
-            if system == 'Darwin':  # macOS
-                app_name = event.data.get('app')
-            else:
-                app_name = event.data.get('title')
-        else:
-            app_name = tldextract.extract(event.data.get('url', '')).domain
-
-        return cls(
-            bucket=bucket_key,
-            id=event.id,
-            timestamp=event.timestamp,
-            duration=event.duration.total_seconds(),
-            datastr=json.dumps(event.data),
-            app=event.data.get('app', ''),
-            title=event.data.get('title', ''),
-            url=event.data.get('url', ''),
-            application_name=app_name,
-            server_sync_status=0
-        )
-
-    def json(self):
-        """
-        Convert to JSON for use in json.dumps. This is useful for debugging and to avoid having to re-serialize every time the object is serialized.
-
-        @return A dict with the data that can be serialized
-        """
-        return {
-            "id": self.id,
-            "timestamp": self.timestamp,
-            "duration": float(self.duration),
-            "data": json.loads(self.datastr),
-            "app": self.app,
-            "title": self.title,
-            "url": self.url,
-            "application_name": self.application_name,
-            "server_sync_status": self.server_sync_status
-        }
-
-
-import platform
-
-
 class EventModel(BaseModel):
     id = AutoField()
     bucket = ForeignKeyField(BucketModel, backref="events", index=True)
@@ -255,6 +187,7 @@ class EventModel(BaseModel):
     url = TextField(null=True)
     application_name = CharField(max_length=50)
     server_sync_status = IntegerField(default=0)
+
     @classmethod
     def from_event(cls, bucket_key, event: Event):
         """
@@ -297,6 +230,8 @@ class EventModel(BaseModel):
                     app_name = titles[0]
             # logger.info("Title: %s, Application: %s", title_name, application_name)
 
+            ApplicationModel.from_application_details(
+                {"app_name": event.data.get('app', ''), "url": event.data.get('url', '')})
             if application_name != '' and title_name != '':
                 try:
                     event_model = cls(
@@ -314,7 +249,7 @@ class EventModel(BaseModel):
                     logger.info(f"EventModel {event_model.title}")
                     return event_model
                 except ValueError as ve:
-                    logger.warning("Vallue Error raised events not inserted: %s",str(ve))
+                    logger.warning("Vallue Error raised events not inserted: %s", str(ve))
                     return None  # Return None explicitly in case of an exception
                 except AttributeError as ae:
                     logger.warning("AttributeError: %s", str(ae))
@@ -359,64 +294,146 @@ class EventModel(BaseModel):
 
 class SettingsModel(BaseModel):
     id = AutoField()
-    code = CharField()
-    value = CharField()
-
-    @classmethod
-    def from_settings(cls, code, value):
-        return cls(
-            code=code,
-            value=value,
-        )
+    code = CharField(unique=True)  # Ensure 'code' is unique across all settings
+    value = TextField()
 
     def json(self):
         """
-        Convert the model instance to a JSON-compatible dictionary.
-        :return: A dictionary representation of the settings.
+        Convert the settings value from a JSON string to a Python dictionary for easier access in the application.
         """
         return {
             "id": self.id,
             "code": self.code,
-            "value": self.value,
-
+            "value": json.loads(self.value),  # Assuming the value is stored in JSON format
         }
+
+    @classmethod
+    def from_settings(cls, code, value):
+        """
+        Helper method to create a SettingsModel instance from a code and a Python dictionary value.
+        This method serializes the value to a JSON string for storage.
+        """
+        return cls(
+            code=code,
+            value=json.dumps(value),  # Serialize the Python dictionary to a JSON string
+        )
+
+
+
+def format_timezone_offset(offset):
+    """
+    Formats the timezone offset into the format "-08:00".
+    :param offset: The timezone offset to format.
+    :return: The formatted timezone offset.
+    """
+    # Extract hours and minutes from the offset
+    hours = offset[:3]
+    minutes = offset[3:]
+
+    # Add the colon between hours and minutes
+    formatted_offset = f"{hours}:{minutes}"
+    return formatted_offset
+
+
+def setup_weekday_settings():
+    try:
+        # Define default settings for weekdays
+        default_weekday_settings = {
+                "Monday": False,
+                "Tuesday": False,
+                "Wednesday": False,
+                "Thursday": False,
+                "Friday": False,
+                "Saturday": False,
+                "Sunday": False,
+                "starttime" : "9:30 AM",
+                "endtime" : "6:30 PM"
+            }
+
+
+        # Check if the weekday settings already exist in the database
+        existing_weekday_instance = SettingsModel.get_or_none(code="weekdays_schedule")
+        if not existing_weekday_instance:
+            SettingsModel.from_settings(code="weekdays_schedule", value=default_weekday_settings).save()
+            print("Weekday schedule settings added successfully.")
+
+    except Exception as e:
+        print(f"An unexpected error occurred while setting up weekday settings: {e}")
+
+
+def ensure_default_settings():
+    # Use strftime with %z to format the timezone as +HHMM
+    # Then insert a colon to get the +HH:MM format
+    tz_offset = datetime.now(timezone.utc).astimezone().strftime('%z')
+    formatted_tz = tz_offset[:3] + ':' + tz_offset[3:]  # Format to +HH:MM
+
+    default_settings = {
+        "time_zone": formatted_tz,
+        "timeformat": 12,
+        "idle_time" : True,
+        "schedule" : False,
+    }
+
+    for code, value in default_settings.items():
+        setting, created = SettingsModel.get_or_create(code=code, defaults={"value": json.dumps(value)})
+        if created:
+            print(f"Created default setting: {code} = {value}")
+        else:
+            print(f"Default setting already exists: {code} = {setting.value}")
+
+
 
 
 class ApplicationModel(BaseModel):
     id = AutoField()
     type = CharField()
-    name = CharField(null=False, unique=True)
+    name = CharField(null=True, unique=True)
+    url = CharField(null=True, unique=True)
     alias = CharField(null=True)
-    is_blocked = BooleanField(default=False)
-    is_ignore_idle_time = BooleanField(default=False)
+    is_blocked = BooleanField(default=0)
+    is_ignore_idle_time = BooleanField(default=0)
     color = CharField(null=True)
-    created_at = DateTimeField(default=datetime.now)
-    updated_at = DateTimeField(default=datetime.now)
+    created_at = DateTimeField(default=datetime.now())
+    updated_at = DateTimeField(default=datetime.now())
+    criteria = CharField(null=True)
 
     @classmethod
     def from_application_details(cls, application_details):
-        existing_instance = cls.get_or_none(name=application_details.get("name", ""))
-        if existing_instance is None:
-            current_time = datetime.now()
-            return cls(
-                type=application_details.get("type", ""),
-                name=application_details.get("name", ""),
+        logger.info(f"Processing application details: {application_details}")
+
+        # Early return for AFK app_name
+        if application_details.get('app_name', '').lower() == 'afk':
+            logger.info("AFK event detected, returning None")
+            return None
+
+        # Extract application details
+        app_url = application_details.get("url", "").strip()
+        app_name = application_details.get("app_name", "").replace('.exe', '').strip()
+
+        try:
+            new_instance, created = cls.get_or_create(
+                type="web application" if app_url else "application",
+                name=app_name if not app_url else None,
+                url=app_url if app_url else None,
                 alias=application_details.get("alias", ""),
                 is_blocked=application_details.get("is_blocked", False),
                 is_ignore_idle_time=application_details.get("idle_time_ignored", False),
                 color=application_details.get("color", ""),
-                created_at=current_time,
-                updated_at=current_time,
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                criteria=application_details.get("criteria", "")
             )
-        else:
-            existing_instance.type = application_details.get("type", "")
-            existing_instance.alias = application_details.get("alias", "")
-            existing_instance.is_blocked = application_details.get("is_blocked", False)
-            existing_instance.is_ignore_idle_time = application_details.get("idle_time_ignored", False)
-            existing_instance.color = application_details.get("color", "")
-            existing_instance.updated_at = datetime.now()
-            existing_instance.save()
-            return existing_instance
+
+            if created:
+                logger.info(f"New application created: {new_instance}")
+            else:
+                logger.info(f"Application already exists: {new_instance}")
+
+            return new_instance
+
+        except peewee.IntegrityError as e:
+            logger.warning(f"Integrity error occurred: {e}")
+            return None
 
     def json(self):
         """
@@ -427,12 +444,14 @@ class ApplicationModel(BaseModel):
             "id": self.id,
             "type": self.type,
             "name": self.name,
+            "url": self.url,
             "alias": self.alias,
             "is_blocked": self.is_blocked,
             "is_ignore_idle_time": self.is_ignore_idle_time,
             "color": self.color,
             "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
             "updated_at": self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
+            "criteria": self.criteria
         }
 
 
@@ -543,10 +562,16 @@ class PeeweeStorage(AbstractStorage):
             # Update bucket keys
             self.update_bucket_keys()
 
+            ensure_default_settings()
+            setup_weekday_settings()
+            db_cache.store(application_cache_key, self.retrieve_application_names())
+            db_cache.store(settings_cache_key, self.retrieve_all_settings())
+
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
             start_all_module()
+
 
             return True
 
@@ -693,9 +718,10 @@ class PeeweeStorage(AbstractStorage):
          @return The newly inserted event. Note that you must call save () on the event before you call this
         """
         # e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-        if event.data['title']!='' and event.data['app']!='':
+        if event.data['title'] != '' and event.data['app'] != '':
             e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-            is_exist = self._get_last_event_by_app_title_pulsetime(app = event.application_name, title = event.title)
+
+            is_exist = self._get_last_event_by_app_title_pulsetime(app=event.application_name, title=event.title)
             if 'afk' not in event.application_name and is_exist:
                 # logger.info(f'event app: {event.application_name} title: {event.title}')
                 logger.info(f'befor app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
@@ -716,7 +742,6 @@ class PeeweeStorage(AbstractStorage):
         else:
             logger.warning("None Type object has no server_sync_status attribut or Title were empty for this event")
             return event
-
 
     def insert_many(self, bucket_id, events: List[Event]) -> None:
         """
@@ -947,7 +972,8 @@ class PeeweeStorage(AbstractStorage):
         return (
             EventModel
             .select()
-            .where((EventModel.application_name == app) & (EventModel.title == title) & (EventModel.timestamp >= time_60_seconds_ago_utc))
+            .where((EventModel.application_name == app) & (EventModel.title == title) & (
+                    EventModel.timestamp >= time_60_seconds_ago_utc))
             .order_by(EventModel.timestamp.desc())
             .first()
         )
@@ -1096,7 +1122,6 @@ class PeeweeStorage(AbstractStorage):
     def get_last_event_by_app_title_pulsetime(self, app, title) -> EventModel:
         return self._get_last_event_by_app_title_pulsetime(app=app, title=title)
 
-
     def get_most_used_apps(
             self,
             starttime: Optional[datetime] = None,
@@ -1192,92 +1217,76 @@ class PeeweeStorage(AbstractStorage):
 
         return q
 
-    def save_settings(self, code, value):
+    def save_settings(self, code, value_dict):
         """
-        Save or update settings in the database.
-        :param settings_id: The unique identifier for the settings.
-        :param code: The code associated with the settings.
-        :param value: The value of the settings to be saved.
-        :return: The saved or updated settings object.
+        Save or update a setting in the database. If the setting with the given code exists, it will be updated.
+        Otherwise, a new setting will be created.
+
+        Parameters:
+        - code (str): The unique code for the setting.
+        - value_dict (dict): The value of the setting, provided as a dictionary which will be serialized to JSON.
+
+        Returns:
+        - SettingsModel instance of the saved or updated setting.
+        """
+        value_json = json.dumps(value_dict)  # Convert the dictionary to a JSON string
+        setting, created = SettingsModel.get_or_create(code=code, defaults={'value': value_json})
+        if not created:
+            setting.value = value_json
+            setting.save()
+            db_cache.store(settings_cache_key, self.retrieve_all_settings())
+        return setting
+
+    def retrieve_setting(self, code):
+        """
+        Retrieve a single setting from the database by its code.
+
+        Parameters:
+        - code (str): The unique code for the setting.
+
+        Returns:
+        - The value of the setting as a dictionary if the setting exists; otherwise, None.
         """
         try:
-            # Attempt to retrieve an existing settings object or create a new one if it doesn't exist
-            settings, created = SettingsModel.get_or_create(code=code,
-                                                            defaults={'value': value})
-
-            if not created:
-                # If the settings object already exists, update the code and value
-                settings.code = code
-                settings.value = value  # Set value as empty string if it's empty
-                settings.save()  # Save the changes to the database
-
-            return settings  # Return the settings object, whether it was created or updated
-        except peewee.IntegrityError as e:
-            logger.error(f"Integrity error while saving settings: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while saving settings: {e}")
-            raise
-
-    def retrieve_settings(self, code):
-        """
-        Retrieve settings from the database.
-        :param settings_id: The unique identifier for the settings.
-        :return: A dictionary of the settings if found, otherwise None.
-        """
-        try:
-            settings = SettingsModel.get(SettingsModel.code == code)
-            return settings.value
-        except DoesNotExist:
+            setting = SettingsModel.get(SettingsModel.code == code)
+            return json.loads(setting.value)  # Convert the JSON string back to a dictionary
+        except SettingsModel.DoesNotExist:
             return None
-    def update_settings(self, code, value):
+
+    def retrieve_all_settings(self):
         """
-        Update settings in the database.
-        :param code: The code associated with the settings to be updated.
-        :param value: The new value of the settings.
-        :return: The updated settings object if successful, None otherwise.
+        Retrieve all settings from the database, deserializing each value from a JSON string.
+        Handles cases where the value might not be a valid JSON string.
+        """
+        all_settings = {}
+        for setting in SettingsModel.select():
+            try:
+                # Attempt to deserialize each value from a JSON string
+                all_settings[setting.code] = json.loads(setting.value) if setting.value else None
+            except json.JSONDecodeError as e:
+                # Log the error and skip this setting or set a default value
+                logger.error(f"Error decoding JSON for setting '{setting.code}': {e}")
+                all_settings[setting.code] = None  # Or set a default value if appropriate
+        return all_settings
+
+    def update_setting(code, new_value_dict):
+        """
+        Update the value of an existing setting in the database.
+
+        Parameters:
+        - code (str): The unique code for the setting to update.
+        - new_value_dict (dict): The new value for the setting, provided as a dictionary.
+
+        Returns:
+        - The updated SettingsModel instance if the update was successful; otherwise, None.
         """
         try:
-            # Attempt to retrieve the settings object by code
-            settings = SettingsModel.get_or_none(code=code)
-            if settings:
-                # Update the value of the settings
-                settings.value = value
-                settings.save()  # Save the changes to the database
-                return settings  # Return the updated settings object
-            else:
-                logger.warning(f"No settings found with code '{code}'")
-                return None
-        except peewee.IntegrityError as e:
-            logger.error(f"Integrity error while updating settings: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while updating settings: {e}")
-            raise
-
-    def delete_settings(self, code):
-        """
-        Delete settings from the database.
-        :param code: The code associated with the settings to be deleted.
-        :return: True if deletion is successful, False otherwise.
-        """
-        try:
-            # Attempt to retrieve the settings object by code
-            settings = SettingsModel.get_or_none(code=code)
-            if settings:
-                # Delete the settings object
-                settings.delete_instance()
-                return True  # Deletion successful
-            else:
-                logger.warning(f"No settings found with code '{code}'")
-                return False  # No settings found for deletion
-        except peewee.IntegrityError as e:
-            logger.error(f"Integrity error while deleting settings: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred while deleting settings: {e}")
-            raise
-
+            setting = SettingsModel.get(SettingsModel.code == code)
+            setting.value = json.dumps(new_value_dict)  # Serialize the new value to JSON
+            setting.save()
+            return setting
+        except SettingsModel.DoesNotExist:
+            return None
 
     def save_application_details(self, application_details):
         """
@@ -1286,18 +1295,35 @@ class PeeweeStorage(AbstractStorage):
         :return: The saved or updated ApplicationModel object.
         """
         try:
-            # Attempt to retrieve an existing application object or create a new one if it doesn't exist
-            application, created = ApplicationModel.get_or_create(name=application_details['name'],
-                                                                defaults=application_details)
+            if 'url' in application_details and application_details['url']:
+                application = ApplicationModel.get_or_none(url=application_details['url'])
+                if application:
+                    # Update existing application details
+                    for key, value in application_details.items():
+                        setattr(application, key, value)
+                    application.updated_at = datetime.now()
+                    application.save()
+                else:
+                    application = ApplicationModel.create(**application_details)
+            elif 'name' in application_details and application_details['name']:
+                existing_application = ApplicationModel.get_or_none(name=application_details['name'])
+                if existing_application:
+                    # Update existing application details
+                    for key, value in application_details.items():
+                        setattr(existing_application, key, value)
+                    existing_application.updated_at = datetime.now()
+                    existing_application.save()
+                    application = existing_application
+                else:
+                    # Create a new application
+                    application = ApplicationModel.create(**application_details)
+            else:
+                raise ValueError("Either 'url' or non-empty 'name' must be provided in application_details.")
 
-            if not created:
-                # If the application object already exists, update its details
-                for key, value in application_details.items():
-                    setattr(application, key, value)
-                application.updated_at = datetime.now()  # Update the 'updated_at' field to current time
-                application.save()  # Save the changes to the database
+            # Refresh the application names after saving
+            self.retrieve_application_names()
 
-            return application  # Return the application object, whether it was created or updated
+            return application
         except peewee.IntegrityError as e:
             logger.error(f"Integrity error while saving application details: {e}")
             raise
@@ -1325,24 +1351,37 @@ class PeeweeStorage(AbstractStorage):
         except DoesNotExist:
             return None
 
-    def update_application_details(self, application_id, update_details):
+    def retrieve_application_names(self):
+        """
+        Retrieve all application names and blocked statuses from the database.
+        :return: A JSON-serializable list of dictionaries with application names and blocked statuses if found,
+                 otherwise None.
+        """
+        application_details = {}
         try:
-            existing_instance = ApplicationModel.get_or_none(id=application_id)
-            if existing_instance:
-                for field, value in update_details.items():
-                    if hasattr(ApplicationModel, field):
-                        setattr(existing_instance, field, value)
-                existing_instance.updated_at = datetime.now()
-                existing_instance.save()
-                return existing_instance  # Return the updated instance
-            else:
-                logger.warning("No application found with ID %s", application_id)
-                return None
-        except Exception as e:
-            logger.error("Error updating application details: %s", e)
-            return None
+            # Retrieve application names and blocked statuses where name is not None
+            app_query_results = ApplicationModel.select(ApplicationModel.name, ApplicationModel.is_blocked) \
+                .where((ApplicationModel.name.is_null(False)) & (ApplicationModel.name != ""))
 
-    def delete_application_details(self,application_id):
+            # Convert the query results to a list of dictionaries
+            application_details['app'] = [{'name': result.name, 'is_blocked': result.is_blocked}
+                                          for result in app_query_results]
+
+            # Retrieve URLs and blocked statuses where URL is not None and is_blocked is True
+            url_query_results = ApplicationModel.select(ApplicationModel.url, ApplicationModel.is_blocked) \
+                .where((ApplicationModel.url.is_null(False)) & (ApplicationModel.is_blocked == True) & (
+                    ApplicationModel.url != ""))
+
+            # Convert the query results to a list of dictionaries
+            application_details['url'] = [{'url': result.url, 'is_blocked': result.is_blocked}
+                                          for result in url_query_results]
+            db_cache.update(application_cache_key, application_details)
+            return application_details  # Return the list of application details
+        except Exception as e:
+            logger.error(f"An unexpected error occurred while retrieving application names: {e}")
+            raise
+
+    def delete_application_details(self, application_id):
         try:
             existing_instance = ApplicationModel.get_or_none(id=application_id)
             if existing_instance:
@@ -1354,6 +1393,38 @@ class PeeweeStorage(AbstractStorage):
         except DoesNotExist:
             # Handle the case where the instance with the provided name doesn't exist
             return None
+
+    def get_blocked(self):
+        """
+        Retrieve all application names and blocked statuses from the database.
+        :return: A JSON-serializable list of dictionaries with application names and blocked statuses if found,
+                 otherwise None.
+        """
+        application_details = {}
+        try:
+            # Retrieve application names and blocked statuses where name is not None
+            app_query_results = ApplicationModel.select(ApplicationModel.name, ApplicationModel.is_blocked) \
+                .where((ApplicationModel.name.is_null(False)) & (ApplicationModel.name != "") & (
+                        ApplicationModel.is_blocked == True))
+
+            # Convert the query results to a list of dictionaries
+            application_details['app'] = [{'name': result.name, 'is_blocked': result.is_blocked}
+                                          for result in app_query_results]
+
+            # Retrieve URLs and blocked statuses where URL is not None and is_blocked is True
+            url_query_results = ApplicationModel.select(ApplicationModel.url, ApplicationModel.is_blocked) \
+                .where((ApplicationModel.url.is_null(False)) & (ApplicationModel.is_blocked == True) & (
+                    ApplicationModel.url != ""))
+
+            # Convert the query results to a list of dictionaries
+            application_details['url'] = [{'url': result.url, 'is_blocked': result.is_blocked}
+                                          for result in url_query_results]
+            db_cache.update(application_cache_key, application_details)
+            return application_details  # Return the list of application details
+        except Exception as e:
+            logger.error(f"An unexpected error occurred while retrieving application names: {e}")
+            raise
+
     # def save_date(self):
     #     settings, created = SettingsModel.get_or_create(code="System Date",
     #                                                     defaults={'value': datetime.now().date()})

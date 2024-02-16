@@ -249,14 +249,19 @@ class AbstractStorage(metaclass=ABCMeta):
         return NotImplementedError
 
     @abstractmethod
-    def retrieve_settings(self, code) -> dict:
+    def retrieve_setting(self, code) -> dict:
         """
          Retrieve settings from the storage. This is a low - level method that should be implemented by sub - classes.
 
+         @param code:
          @param settings_id - ID of the settings to retrieve.
 
          @return Dictionary of settings or None if not found. Note that the keys are strings and the values are dictionaries
         """
+        raise NotImplementedError
+
+    @abstractmethod
+    def retrieve_all_settings(self) -> dict:
         raise NotImplementedError
 
     def save_application_details(self, application_details):
@@ -264,7 +269,11 @@ class AbstractStorage(metaclass=ABCMeta):
 
     def retrieve_application_details(self) -> dict:
         raise NotImplementedError
-    def update_application_details(self,application_name,update_detail):
+
+    def retrieve_application_names(self):
+        raise NotImplementedError
+
+    def update_application_details(self,update_detail):
         raise NotImplementedError
     def delete_application_details(self,application_name):
         raise NotImplementedError
