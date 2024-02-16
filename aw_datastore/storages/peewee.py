@@ -407,8 +407,13 @@ class ApplicationModel(BaseModel):
             return None
 
         # Extract application details
-        app_url = application_details.get("url", "").strip()
-        app_name = application_details.get("app_name", "").replace('.exe', '').strip()
+        app_url = application_details.get("url", None)
+        if app_url is not None:
+            app_url = app_url.strip()
+
+        app_name = application_details.get("app_name", None)
+        if app_name is not None:
+            app_name = app_name.replace('.exe', '').strip()
 
         try:
             new_instance, created = cls.get_or_create(
