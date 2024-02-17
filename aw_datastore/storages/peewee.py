@@ -20,6 +20,9 @@ from playhouse.shortcuts import model_to_dict
 
 from aw_core.cache import cache_user_credentials
 from aw_core import db_cache
+from aw_core.launch_start import launch_app, check_startup_status
+from aw_qt.manager import Manager
+
 
 if sys.platform == "win32":
     _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
@@ -370,8 +373,9 @@ def ensure_default_settings():
     default_settings = {
         "time_zone": formatted_tz,
         "timeformat": 12,
-        "idle_time" : True,
+        "idle_time" : Manager().module_status("aw-watcher-afk") if "aw-watcher-afk" in Manager().status() else False,
         "schedule" : False,
+        "launch" : True
     }
 
     for code, value in default_settings.items():
@@ -571,12 +575,13 @@ class PeeweeStorage(AbstractStorage):
             setup_weekday_settings()
             db_cache.store(application_cache_key, self.retrieve_application_names())
             db_cache.store(settings_cache_key, self.retrieve_all_settings())
-
+            self.save_settings("idle_time",Manager().module_status("aw-watcher-afk") if "aw-watcher-afk" in Manager().status() else False)
+            self.save_settings("launch",check_startup_status())
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
             start_all_module()
-
+            self.launch_application_start()
 
             return True
 
@@ -714,6 +719,7 @@ class PeeweeStorage(AbstractStorage):
             raise Exception("Bucket did not exist, could not get metadata")
 
     def insert_one(self, bucket_id: str, event: Event) -> Event:
+        print(event)
         """
          Inserts a single event into the database. This is a convenience method for creating and persisting an : class : ` EventModel ` object from a bucket and event.
 
@@ -1430,6 +1436,10 @@ class PeeweeStorage(AbstractStorage):
             logger.error(f"An unexpected error occurred while retrieving application names: {e}")
             raise
 
+    def launch_application_start(self):
+        settings= db_cache.retrieve(settings_cache_key)
+        if settings['launch']:
+            launch_app()
     # def save_date(self):
     #     settings, created = SettingsModel.get_or_create(code="System Date",
     #                                                     defaults={'value': datetime.now().date()})
