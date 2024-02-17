@@ -33,6 +33,7 @@ timeslot = "*"
 cryptography = "*"
 cryptocode = "*"
 tldextract = "*"
+winshell = {version = "*", markers = "sys_platform == 'win32'" }
 pysqlcipher3 = [
     { version = "*", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" },
     { file = "pysqlcipher3-1.2.0-cp311-cp311-win_amd64.whl", markers = "sys_platform == 'win32'" }

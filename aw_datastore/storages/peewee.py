@@ -20,7 +20,7 @@ from playhouse.shortcuts import model_to_dict
 
 from aw_core.cache import cache_user_credentials
 from aw_core import db_cache
-from aw_core.launch_start import launch_app, check_startup_status
+from aw_core.launch_start import create_shortcut, launch_app, check_startup_status
 from aw_qt.manager import Manager
 
 
@@ -1468,8 +1468,13 @@ class PeeweeStorage(AbstractStorage):
 
     def launch_application_start(self):
         settings= db_cache.retrieve(settings_cache_key)
-        if settings['launch']:
+        # The code is checking if the value of the 'launch' key in the settings dictionary is truthy
+        # (evaluates to True), and if it is, it calls the function launch_app().
+        if settings['launch'] and sys.platform == "darwin":
             launch_app()
+        elif settings['launch'] and sys.platform == "win32":
+            create_shortcut()
+            
     # def save_date(self):
     #     settings, created = SettingsModel.get_or_create(code="System Date",
     #                                                     defaults={'value': datetime.now().date()})

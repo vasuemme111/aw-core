@@ -1,8 +1,18 @@
 import os
 import getpass
 import subprocess
+import winshell
 
 
+startup_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+shortcut_name = 'Sundial.lnk'
+file_path = os.path.abspath(__file__)
+_module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+app_path = os.path.join(_module_dir, 'aw-qt.exe')
+
+
+
+# Mac
 def load_plist(plist_path):
     # Load and start the service using launchctl
     os.system(f"launchctl load {plist_path}")
@@ -69,3 +79,30 @@ def check_startup_status():
     else:
         print(f"The application with bundle identifier '{bundle_identifier}' does not start on launch.")
         return False
+    
+
+# Windows
+
+def create_shortcut():
+    print(app_path)
+    shortcut = os.path.join(startup_path, shortcut_name)
+    with winshell.shortcut(shortcut) as link:
+        link.path = app_path
+        link.description = "Shortcut for YourApp"
+    return {"status": "success", "message": "Shortcut created successfully"}
+
+
+def delete_shortcut():
+    shortcut = os.path.join(startup_path, shortcut_name)
+    if os.path.exists(shortcut):
+        os.remove(shortcut)
+        return {"status": "success", "message": "Shortcut deleted successfully"}
+    else:
+        return {"status": "error", "message": "Shortcut not found"}
+    
+def get_status():
+    shortcut = os.path.join(startup_path, shortcut_name)
+    if os.path.exists(shortcut):
+        return {"status": "enabled"}, 200
+    else:
+        return {"status": "disabled"}, 200
