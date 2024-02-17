@@ -11,7 +11,7 @@ from typing import (
 )
 import re
 from urllib.parse import unquote
-from aw_core.util import get_domain
+from aw_core.util import get_domain, remove_more_page_suffix
 import iso8601
 from tldextract import tldextract
 
@@ -138,7 +138,7 @@ class Event(dict):
         if "localhost" in app_name or "10" in app_name or "14" in app_name:
             titles = re.split(r'\s—\s|\s-\s|\s\|\s', self.title)
             if titles and isinstance(titles, list):
-                app_name = titles[0]
+                app_name = remove_more_page_suffix(titles[0])
         self.application_name = app_name
         self.server_sync_status = server_sync_status
 

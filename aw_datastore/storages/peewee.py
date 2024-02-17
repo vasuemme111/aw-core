@@ -34,7 +34,7 @@ elif sys.platform == "darwin":
     openssl = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
     libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
 
-from aw_core.util import decrypt_uuid, get_document_title, get_domain, load_key, start_all_module, stop_all_module
+from aw_core.util import decrypt_uuid, get_document_title, get_domain, load_key, remove_more_page_suffix, start_all_module, stop_all_module
 import keyring
 import iso8601
 from aw_core.dirs import get_data_dir
@@ -232,7 +232,7 @@ class EventModel(BaseModel):
             if "localhost" in app_name or "10" in app_name or "14" in app_name:
                 titles = re.split(r'\s—\s|\s-\s|\s\|\s', event.title)
                 if titles and isinstance(titles, list):
-                    app_name = titles[0]
+                    app_name = remove_more_page_suffix(titles[0])
             # logger.info("Title: %s, Application: %s", title_name, application_name)
 
             ApplicationModel.from_application_details(
@@ -1474,7 +1474,7 @@ class PeeweeStorage(AbstractStorage):
             launch_app()
         elif settings['launch'] and sys.platform == "win32":
             create_shortcut()
-            
+
     # def save_date(self):
     #     settings, created = SettingsModel.get_or_create(code="System Date",
     #                                                     defaults={'value': datetime.now().date()})

@@ -304,3 +304,13 @@ def get_document_title(event):
     if "sharepoint.com" in url:
         title = "OneDrive"
     return title
+
+def remove_more_page_suffix(text):
+    # Check if "More Page" string exists in the text
+    if "more page" in text.lower():
+        # Split the text at "And"
+        words = text.split("and")
+        # Return the first element
+        return words[0].strip()
+    else:
+        return text
