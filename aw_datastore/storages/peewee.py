@@ -62,6 +62,8 @@ import cryptocode
 import keyring
 from peewee import DoesNotExist
 
+logging.basicConfig(encoding='utf-8')
+
 logger = logging.getLogger(__name__)
 
 # Prevent debug output from propagating
@@ -249,7 +251,10 @@ class EventModel(BaseModel):
                         application_name=app_name,
                         server_sync_status=cls.server_sync_status or 0
                     )
-                    logger.info(f"EventModel {event_model.title}")
+                    # decoded_title = bytes(event_model.title, 'utf-8').decode('unicode_escape')
+                    # # Log the decoded title
+                    # logging.info("EventModel %s", decoded_title.decoded('utf-8'))
+                    # logger.info("EventModel %s", title_name.encode('utf-8'))
                     return event_model
                 except ValueError as ve:
                     logger.warning("Vallue Error raised events not inserted: %s", str(ve))
@@ -441,9 +446,33 @@ class ApplicationModel(BaseModel):
             return new_instance
 
         except peewee.IntegrityError as e:
-            logger.warning(f"Integrity error occurred: {e}")
-            return None
-
+            # logger.warning(f"Integrity error occurred: {e}")
+            # Here you handle the violation gracefully
+            # Check all fields for an existing record
+            existing_instance = cls.get_or_none(
+                type="web application" if app_url else "application",
+                name=app_name if not app_url else None,
+                url=app_url if app_url else None,
+                alias=application_details.get("alias", ""),
+                is_blocked=application_details.get("is_blocked", False),
+                is_ignore_idle_time=application_details.get("idle_time_ignored", False),
+                color=application_details.get("color", ""),
+                criteria=application_details.get("criteria", "")
+            )
+            if existing_instance:
+                logger.info(f"Updating existing application: {existing_instance}")
+                # Update the existing instance with new values
+                existing_instance.alias = application_details.get("alias", "")
+                existing_instance.is_blocked = application_details.get("is_blocked", False)
+                existing_instance.is_ignore_idle_time = application_details.get("idle_time_ignored", False)
+                existing_instance.color = application_details.get("color", "")
+                existing_instance.criteria = application_details.get("criteria", "")
+                existing_instance.save()
+                logger.info(f"Existing application updated: {existing_instance}")
+                return existing_instance
+            else:
+                logger.error("No existing application found to update")
+                # You can choose to raise the error or handle it differently based on your application's needs
     def json(self):
         """
         Convert the model instance to a JSON-compatible dictionary.
@@ -731,7 +760,6 @@ class PeeweeStorage(AbstractStorage):
         # e = EventModel.from_event(self.bucket_keys[bucket_id], event)
         if event.data['title'] != '' and event.data['app'] != '':
             e = EventModel.from_event(self.bucket_keys[bucket_id], event)
-
             is_exist = self._get_last_event_by_app_title_pulsetime(app=event.application_name, title=event.title)
             if 'afk' not in event.application_name and is_exist:
                 # logger.info(f'event app: {event.application_name} title: {event.title}')
@@ -743,13 +771,15 @@ class PeeweeStorage(AbstractStorage):
                 event.id = is_exist.id
                 event.duration = float(is_exist.duration)
                 return event
-            else:
+            elif e is not None:
                 e.server_sync_status = 0
                 if not e.url:
                     e.url = ''
                 e.save()
                 event.id = e.id
                 return event
+            else:
+                logger.warning("Event model has None")
         else:
             logger.warning("None Type object has no server_sync_status attribut or Title were empty for this event")
             return event
