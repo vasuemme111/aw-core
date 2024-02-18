@@ -1,14 +1,16 @@
 import os
 import getpass
 import subprocess
-import winshell
+import sys
+if sys.platform == "win32":
+    import winshell
 
-
-startup_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
-shortcut_name = 'Sundial.lnk'
-file_path = os.path.abspath(__file__)
-_module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-app_path = os.path.join(_module_dir, 'aw-qt.exe')
+if sys.platform == "win32":
+    startup_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+    shortcut_name = 'Sundial.lnk'
+    file_path = os.path.abspath(__file__)
+    _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    app_path = os.path.join(_module_dir, 'aw-qt.exe')
 
 
 
@@ -70,15 +72,22 @@ def delete_launch_app():
     return True
 
 def check_startup_status():
-    bundle_identifier = "net.ralvie.sundial"
-    command = f"launchctl list | grep {bundle_identifier}"
-    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    if result.returncode == 0:
-        print(f"The application with bundle identifier '{bundle_identifier}' starts on launch.")
-        return True
-    else:
-        print(f"The application with bundle identifier '{bundle_identifier}' does not start on launch.")
-        return False
+    if sys.platform == "darwin":
+        bundle_identifier = "net.ralvie.Sundial"
+        command = f"launchctl list | grep {bundle_identifier}"
+        result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        if result.returncode == 0:
+            print(f"The application with bundle identifier '{bundle_identifier}' starts on launch.")
+            return True
+        else:
+            print(f"The application with bundle identifier '{bundle_identifier}' does not start on launch.")
+            return False
+    elif sys.platform == "win32":
+        shortcut = os.path.join(startup_path, shortcut_name)
+        if os.path.exists(shortcut):
+            return {"status": "enabled"}, 200
+        else:
+            return {"status": "disabled"}, 200
     
 
 # Windows
@@ -99,10 +108,3 @@ def delete_shortcut():
         return {"status": "success", "message": "Shortcut deleted successfully"}
     else:
         return {"status": "error", "message": "Shortcut not found"}
-    
-def get_status():
-    shortcut = os.path.join(startup_path, shortcut_name)
-    if os.path.exists(shortcut):
-        return {"status": "enabled"}, 200
-    else:
-        return {"status": "disabled"}, 200

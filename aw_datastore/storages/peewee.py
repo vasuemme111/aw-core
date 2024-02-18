@@ -23,7 +23,6 @@ from aw_core import db_cache
 from aw_core.launch_start import create_shortcut, launch_app, check_startup_status
 from aw_qt.manager import Manager
 
-
 if sys.platform == "win32":
     _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
     os.add_dll_directory(_module_dir)
@@ -34,7 +33,8 @@ elif sys.platform == "darwin":
     openssl = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libcrypto.3.dylib')
     libsqlcipher = ctypes.cdll.LoadLibrary(libsqlcipher_path + '/libsqlcipher.0.dylib')
 
-from aw_core.util import decrypt_uuid, get_document_title, get_domain, load_key, remove_more_page_suffix, start_all_module, stop_all_module
+from aw_core.util import decrypt_uuid, get_document_title, get_domain, load_key, remove_more_page_suffix, \
+    start_all_module, stop_all_module
 import keyring
 import iso8601
 from aw_core.dirs import get_data_dir
@@ -220,7 +220,6 @@ class EventModel(BaseModel):
                 if "sharepoint.com" in url:
                     app_name = "OneDrive"
 
-
             if ".exe" in app_name.lower():
                 app_name = re.sub(r'\.exe$', '', app_name)
             if "ApplicationFrameHost" in app_name or "Code" in app_name:
@@ -327,7 +326,6 @@ class SettingsModel(BaseModel):
         )
 
 
-
 def format_timezone_offset(offset):
     """
     Formats the timezone offset into the format "-08:00".
@@ -347,17 +345,16 @@ def setup_weekday_settings():
     try:
         # Define default settings for weekdays
         default_weekday_settings = {
-                "Monday": False,
-                "Tuesday": False,
-                "Wednesday": False,
-                "Thursday": False,
-                "Friday": False,
-                "Saturday": False,
-                "Sunday": False,
-                "starttime" : "9:30 AM",
-                "endtime" : "6:30 PM"
-            }
-
+            "Monday": False,
+            "Tuesday": False,
+            "Wednesday": False,
+            "Thursday": False,
+            "Friday": False,
+            "Saturday": False,
+            "Sunday": False,
+            "starttime": "9:30 AM",
+            "endtime": "6:30 PM"
+        }
 
         # Check if the weekday settings already exist in the database
         existing_weekday_instance = SettingsModel.get_or_none(code="weekdays_schedule")
@@ -378,9 +375,9 @@ def ensure_default_settings():
     default_settings = {
         "time_zone": formatted_tz,
         "timeformat": 12,
-        "idle_time" : Manager().module_status("aw-watcher-afk") if "aw-watcher-afk" in Manager().status() else False,
-        "schedule" : False,
-        "launch" : True
+        "idle_time": Manager().module_status("aw-watcher-afk") if "aw-watcher-afk" in Manager().status() else False,
+        "schedule": False,
+        "launch": True
     }
 
     for code, value in default_settings.items():
@@ -389,8 +386,6 @@ def ensure_default_settings():
             print(f"Created default setting: {code} = {value}")
         else:
             print(f"Default setting already exists: {code} = {setting.value}")
-
-
 
 
 class ApplicationModel(BaseModel):
@@ -473,6 +468,7 @@ class ApplicationModel(BaseModel):
             else:
                 logger.error("No existing application found to update")
                 # You can choose to raise the error or handle it differently based on your application's needs
+
     def json(self):
         """
         Convert the model instance to a JSON-compatible dictionary.
@@ -604,14 +600,13 @@ class PeeweeStorage(AbstractStorage):
             setup_weekday_settings()
             db_cache.store(application_cache_key, self.retrieve_application_names())
             db_cache.store(settings_cache_key, self.retrieve_all_settings())
-            self.save_settings("idle_time",Manager().module_status("aw-watcher-afk") if "aw-watcher-afk" in Manager().status() else False)
-            self.save_settings("launch",check_startup_status())
+            self.save_settings("launch", check_startup_status())
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
             start_all_module()
+            self.save_settings("idle_time", self.afk_status())
             self.launch_application_start()
-
             return True
 
     def update_bucket_keys(self) -> None:
@@ -1446,7 +1441,7 @@ class PeeweeStorage(AbstractStorage):
             # Retrieve application names and blocked statuses where name is not None
             app_query_results = ApplicationModel.select(ApplicationModel.name, ApplicationModel.is_blocked) \
                 .where((ApplicationModel.name.is_null(False)) & (ApplicationModel.name != "") & (
-                        ApplicationModel.is_blocked == True))
+                    ApplicationModel.is_blocked == True))
 
             # Convert the query results to a list of dictionaries
             application_details['app'] = [{'name': result.name, 'is_blocked': result.is_blocked}
@@ -1467,13 +1462,28 @@ class PeeweeStorage(AbstractStorage):
             raise
 
     def launch_application_start(self):
-        settings= db_cache.retrieve(settings_cache_key)
+        settings = db_cache.retrieve(settings_cache_key)
+        logger.info(settings)
         # The code is checking if the value of the 'launch' key in the settings dictionary is truthy
         # (evaluates to True), and if it is, it calls the function launch_app().
-        if settings['launch'] and sys.platform == "darwin":
+        if settings['launch'] and sys.platform == "darwin" and not check_startup_status() :
             launch_app()
-        elif settings['launch'] and sys.platform == "win32":
+        elif settings['launch'] and sys.platform == "win32" and not check_startup_status() :
             create_shortcut()
+
+    def afk_status(self):
+        manager = Manager()
+        settings = db_cache.retrieve(settings_cache_key)
+        status_list = manager.status()
+        print(status_list)
+        for watchers in status_list:
+            if watchers['watcher_name'] == "aw-watcher-afk" and watchers['Watcher_status']:
+                if settings['idle_time']:
+                    return True
+                else:
+                    return False
+            else:
+                return False
 
     # def save_date(self):
     #     settings, created = SettingsModel.get_or_create(code="System Date",
