@@ -1,7 +1,7 @@
 import os
-import getpass
 import subprocess
 import sys
+import plistlib
 if sys.platform == "win32":
     import winshell
 
@@ -20,56 +20,32 @@ def load_plist(plist_path):
     os.system(f"launchctl load {plist_path}")
     os.system(f"launchctl start com.ralvie.sundial")
 def launch_app():
-    plist_content = f"""
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST  1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>Label</key>
-            <string>net.ralvie.Sundial</string>
-            <key>ProgramArguments</key>
-            <array>
-                <string>/Applications/Sundial.app/Contents/MacOS/aw-qt</string>
-            </array>
-            <key>RunAtLoad</key>
-            <true/>
-            <key>Description</key>
-            <string>Sundial</string>
-        </dict>
-        </plist>
-        """
+    plist_content = {
+        'Label': 'com.ralvie.sundial',
+        'ProgramArguments': ['/Applications/Sundial.app/Contents/MacOS/aw-qt'],
+        'RunAtLoad': True,
+        # Add other keys and values as needed
+    }
 
-    # Get the current user's username
-    username = getpass.getuser()
-
-    # Define the path to the user's LaunchAgents directory
-    plist_dir = f"/Users/{username}/Library/LaunchAgents/"
-
-    # Ensure the directory exists, if not, create it
-    os.makedirs(plist_dir, exist_ok=True)
-
-    # Define the path to save the plist file
-    plist_path = os.path.join(plist_dir, "com.ralvie.sundial.plist")
+    # Define the path to the LaunchAgents directory and the plist file
+    launchagents_dir = os.path.expanduser('~/Library/LaunchAgents')
+    plist_path = os.path.join(launchagents_dir, 'com.ralvie.sundial.plist')
 
     # Write the plist content to the file
-    with open(plist_path, "w") as plist_file:
-        plist_file.write(plist_content)
-    load_plist(plist_path)
-    return True
+    with open(plist_path, 'wb') as plist_file:
+        plistlib.dump(plist_content, plist_file)
+
+    print(f"Created plist file: {plist_path}")
 
 def delete_launch_app():
-    username = getpass.getuser()
-    plist_dir = f"/Users/{username}/Library/LaunchAgents/"
+    plist_path = os.path.expanduser('~/Library/LaunchAgents/com.ralvie.sundial.plist')
 
-    # Ensure the directory exists, if not, create it
-    os.makedirs(plist_dir, exist_ok=True)
-
-    # Define the path to save the plist file
-    plist_path = os.path.join(plist_dir, "com.ralvie.sundial.plist")
-    # Unload and delete the service using launchctl
-    os.system(f"launchctl unload {plist_path}")
-    os.remove(plist_path)
-    return True
+    # Check if the plist file exists before attempting to delete it
+    if os.path.exists(plist_path):
+        os.remove(plist_path)
+        print("Deleted plist file.")
+    else:
+        print("Plist file does not exist.")
 
 def check_startup_status():
     if sys.platform == "darwin":
