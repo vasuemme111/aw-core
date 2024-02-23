@@ -277,7 +277,7 @@ def is_internet_connected():
     """
     try:
         # Try making a simple HTTP GET request to a well-known website
-        response = requests.get("http://www.google.com")
+        response = requests.get("http://www.bing.com")
         # If the request is successful, return True
         return response.status_code == 200
     except requests.ConnectionError:
