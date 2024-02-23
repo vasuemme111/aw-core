@@ -513,7 +513,7 @@ class PeeweeStorage(AbstractStorage):
          @return True if the database was initialized False if it was
         """
         db_key = ""
-        cache_key = "sundial"
+        cache_key = "TTim"
         cached_credentials = cache_user_credentials(cache_key, "SD_KEYS")
         database_changed = False  # Flag to track if the database has been changed
 

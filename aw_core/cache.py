@@ -47,7 +47,7 @@ def add_password(service, password):
     """
      Add or update a password in the system's secure storage. This is a wrapper around keyring. set_password to allow users to change passwords without affecting the security system.
      
-     @param service - The name of the service e. g. " sundial "
+     @param service - The name of the service e. g. " TTim "
      @param password - The password to add or update. If the password is invalid it will be left untouched
      
      @return " Success " if successful " Failed "
@@ -56,10 +56,10 @@ def add_password(service, password):
     logger.info(f"Adding/updating password for service {service}.")
     # The following commands are used to add generic password to the keyring.
     if is_macos():
-        command = ['security', 'add-generic-password', '-s', service, '-a', "com.ralvie.sundial", '-w', password, '-U']
+        command = ['security', 'add-generic-password', '-s', service, '-a', "com.ralvie.TTim", '-w', password, '-U']
         return "Success" if run_keychain_command(command) else "Failed"
     else:
-        keyring.set_password(service, "com.ralvie.sundial", password)
+        keyring.set_password(service, "com.ralvie.TTim", password)
         return "Success"
 
 
@@ -75,21 +75,21 @@ def keychain_item_exists(service):
     logger.info(f"Checking if a keychain item exists for service {service}.")
     # Returns True if the user is a macOS password.
     if is_macos():
-        command = ['security', 'find-generic-password', '-s', service, '-a', "com.ralvie.sundial"]
+        command = ['security', 'find-generic-password', '-s', service, '-a', "com.ralvie.TTim"]
         try:
             subprocess.run(command, check=True, text=True, capture_output=True)
             return True
         except subprocess.CalledProcessError:
             return False
     else:
-        return keyring.get_password(service, "com.ralvie.sundial") is not None
+        return keyring.get_password(service, "com.ralvie.TTim") is not None
 
 
 def delete_password(service):
     """
      Delete a password from the system's secure storage. This is useful for security reasons such as passwords that are stored in an unencrypted keychain.
      
-     @param service - The sundial service to delete the password for.
+     @param service - The TTim service to delete the password for.
      
      @return " Success " if deletion was successful " Failed " otherwise. >>> import fabtools >>> from fabtools. tools import delete_password
     """
@@ -99,10 +99,10 @@ def delete_password(service):
     if keychain_item_exists(service):
         # Delete the password for the service.
         if is_macos():
-            command = ['security', 'delete-generic-password', '-s', service, '-a', "com.ralvie.sundial"]
+            command = ['security', 'delete-generic-password', '-s', service, '-a', "com.ralvie.TTim"]
             return "Success" if run_keychain_command(command) else "Failed"
         else:
-            keyring.delete_password(service, "com.ralvie.sundial")
+            keyring.delete_password(service, "com.ralvie.TTim")
             return "Success"
     else:
         logger.warning("Keychain item not found.")
@@ -121,14 +121,14 @@ def get_password(service):
     logger.info(f"Retrieving password for service {service}.")
     # Get the password for the service.
     if is_macos():
-        command = ['security', 'find-generic-password', '-s', service, '-a', "com.ralvie.sundial", '-w']
+        command = ['security', 'find-generic-password', '-s', service, '-a', "com.ralvie.TTim", '-w']
         try:
             result = subprocess.run(command, check=True, text=True, capture_output=True)
             return result.stdout.strip()
         except subprocess.CalledProcessError:
             return None
     else:
-        return keyring.get_password(service, "com.ralvie.sundial")
+        return keyring.get_password(service, "com.ralvie.TTim")
 
 
 def store_credentials(key, password):

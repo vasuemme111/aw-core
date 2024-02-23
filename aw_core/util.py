@@ -63,13 +63,13 @@ def generate_key(service_name, user_name):
 # Load the secret key from a file
 def load_key(service_name):
     """
-     Load key from cache. This is used to cache credentials that are stored in Sundial_KEY_FILE
+     Load key from cache. This is used to cache credentials that are stored in TTim_KEY_FILE
 
      @param service_name - Name of the service we are looking up
 
      @return A dict of credentials or None if not found in the cache or no credentials could be found in the
     """
-    cache_key = "sundial"
+    cache_key = "TTim"
     cached_credentials = cache_user_credentials(cache_key, "SD_KEYS")
     # Returns the credentials for the service.
     if cached_credentials != None:
@@ -201,7 +201,7 @@ def reset_user():
     """
     try:
         delete_password("SD_KEYS")
-        cache_key = "sundial"
+        cache_key = "TTim"
         clear_credentials(cache_key)
         stop_all_module()
     except Exception as e:
