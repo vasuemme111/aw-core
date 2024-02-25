@@ -375,7 +375,6 @@ def ensure_default_settings():
     default_settings = {
         "time_zone": formatted_tz,
         "timeformat": 12,
-        "idle_time": Manager().module_status("aw-watcher-afk") if "aw-watcher-afk" in Manager().status() else False,
         "schedule": False,
         "launch": True
     }
@@ -605,7 +604,6 @@ class PeeweeStorage(AbstractStorage):
             if database_changed:
                 stop_all_module()
             start_all_module()
-            self.save_settings("idle_time", self.afk_status())
             self.launch_application_start()
             return True
 
@@ -871,6 +869,7 @@ class PeeweeStorage(AbstractStorage):
                 timestamp >= '{starttime}'
                 AND timestamp <= '{endtime}'
                 AND duration > 30
+                AND app NOT LIKE '%afk%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%LockApp%'
                 AND JSON_EXTRACT(datastr, '$.app') NOT LIKE '%loginwindow%'
                 AND IFNULL(JSON_EXTRACT(datastr, '$.status'), '') NOT LIKE '%not-afk%'
