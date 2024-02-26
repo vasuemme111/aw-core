@@ -216,7 +216,6 @@ def list_modules():
      @return A list of module names in alphabetical order of their status ( as returned by : py : func
     """
     modules = manager.status()
-    print(modules)
     return modules
 
 
@@ -255,14 +254,10 @@ def start_all_module():
      Start all aw - server modules that don't have a watcher_name. This is used to ensure that we're able to listen for changes
     """
     modules = list_modules()
-    idle_time = db_cache.retrieve("settings_cache")['idle_time']
+
     # Start the watcher manager.
     for module in modules:
-        # Start the watcher if not aw server
-        if not module["watcher_name"] == "aw-server":
-            if not idle_time and module["watcher_name"] == "aw-watcher-afk":
-                continue
-            manager.start(module["watcher_name"])
+        manager.start(module["watcher_name"])
 
 
 import requests
@@ -277,7 +272,7 @@ def is_internet_connected():
     """
     try:
         # Try making a simple HTTP GET request to a well-known website
-        response = requests.get("http://www.google.com")
+        response = requests.get("http://www.bing.com")
         # If the request is successful, return True
         return response.status_code == 200
     except requests.ConnectionError:
