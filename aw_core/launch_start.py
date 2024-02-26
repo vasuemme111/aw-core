@@ -61,9 +61,9 @@ def check_startup_status():
     elif sys.platform == "win32":
         shortcut = os.path.join(startup_path, shortcut_name)
         if os.path.exists(shortcut):
-            return {"status": "enabled"}, 200
+            return True, 200
         else:
-            return {"status": "disabled"}, 200
+            return False, 200
     
 
 # Windows
