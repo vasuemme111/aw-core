@@ -1296,8 +1296,9 @@ class PeeweeStorage(AbstractStorage):
         all_settings = {}
         for setting in SettingsModel.select():
             try:
-                # Attempt to deserialize each value from a JSON string
-                all_settings[setting.code] = json.loads(setting.value) if setting.value else None
+                if setting.code != "profilePic":
+                    # Attempt to deserialize each value from a JSON string
+                    all_settings[setting.code] = json.loads(setting.value) if setting.value else None
             except json.JSONDecodeError as e:
                 # Log the error and skip this setting or set a default value
                 logger.error(f"Error decoding JSON for setting '{setting.code}': {e}")
