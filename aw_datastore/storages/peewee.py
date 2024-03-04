@@ -756,7 +756,6 @@ class PeeweeStorage(AbstractStorage):
             is_exist = self._get_last_event_by_app_title_pulsetime(app=event.application_name, title=event.title)
             if 'afk' not in event.application_name and is_exist:
                 # logger.info(f'event app: {event.application_name} title: {event.title}')
-                logger.info(f'befor app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
                 is_exist.duration += Decimal(str(e.duration))
                 is_exist.server_sync_status = 0  # Convert e.duration to Decimal before addition
                 # logger.info(f'after app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
