@@ -146,6 +146,7 @@ def dt_plus_duration(dt, duration):
     )
 
 
+
 class BaseModel(Model):
     class Meta:
         database = db_proxy
@@ -179,8 +180,142 @@ class BucketModel(BaseModel):
             "hostname": self.hostname,
             "data": json.loads(self.datastr) if self.datastr else {},
         }
+    
+class ApplicationModel(BaseModel):
+    id = AutoField()
+    type = CharField()
+    name = CharField(null=True, unique=True)
+    url = CharField(null=True, unique=True)
+    alias = CharField(null=True)
+    is_blocked = BooleanField(default=0)
+    is_ignore_idle_time = BooleanField(default=0)
+    color = CharField(null=True)
+    created_at = DateTimeField(default=datetime.now())
+    updated_at = DateTimeField(default=datetime.now())
+    criteria = CharField(null=True)
+
+    @classmethod
+    def from_application_details(cls, application_details):
+        logger.info(f"Processing application details: {application_details}")
+
+        # Early return for AFK app_name
+        if application_details.get('app_name', '').lower() == 'afk':
+            logger.info("AFK event detected, returning None")
+            return None
+
+        # Extract application details
+        app_url = application_details.get("url", None)
+        if app_url is not None:
+            app_url = app_url.strip()
+
+        app_name = application_details.get("app_name", None)
+        if app_name is not None:
+            app_name = app_name.replace('.exe', '').strip()
+
+        try:
+            new_instance, created = cls.get_or_create(
+                type="web application" if app_url else "application",
+                name=app_name if not app_url else None,
+                url=app_url if app_url else None,
+                alias=application_details.get("alias", ""),
+                is_blocked=application_details.get("is_blocked", False),
+                is_ignore_idle_time=application_details.get("idle_time_ignored", False),
+                color=application_details.get("color", ""),
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                criteria=application_details.get("criteria", "")
+            )
+
+            if created:
+                logger.info(f"New application created: {new_instance}")
+            else:
+                logger.info(f"Application already exists: {new_instance}")
+
+            return new_instance
+
+        except peewee.IntegrityError as e:
+            # logger.warning(f"Integrity error occurred: {e}")
+            # Here you handle the violation gracefully
+            # Check all fields for an existing record
+            existing_instance = cls.get_or_none(
+                type="web application" if app_url else "application",
+                name=app_name if not app_url else None,
+                url=app_url if app_url else None,
+                alias=application_details.get("alias", ""),
+                is_blocked=application_details.get("is_blocked", False),
+                is_ignore_idle_time=application_details.get("idle_time_ignored", False),
+                color=application_details.get("color", ""),
+                criteria=application_details.get("criteria", "")
+            )
+            if existing_instance:
+                logger.info(f"Updating existing application: {existing_instance}")
+                # Update the existing instance with new values
+                existing_instance.alias = application_details.get("alias", "")
+                existing_instance.is_blocked = application_details.get("is_blocked", False)
+                existing_instance.is_ignore_idle_time = application_details.get("idle_time_ignored", False)
+                existing_instance.color = application_details.get("color", "")
+                existing_instance.criteria = application_details.get("criteria", "")
+                existing_instance.save()
+                logger.info(f"Existing application updated: {existing_instance}")
+                return existing_instance
+            else:
+                logger.error("No existing application found to update")
+                # You can choose to raise the error or handle it differently based on your application's needs
+
+    def json(self):
+        """
+        Convert the model instance to a JSON-compatible dictionary.
+        :return: A dictionary representation of the settings.
+        """
+        return {
+            "id": self.id,
+            "type": self.type,
+            "name": self.name,
+            "url": self.url,
+            "alias": self.alias,
+            "is_blocked": self.is_blocked,
+            "is_ignore_idle_time": self.is_ignore_idle_time,
+            "color": self.color,
+            "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
+            "updated_at": self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
+            "criteria": self.criteria
+        }
+    
+def blocked_apps(ap_name):
+    """
+    blocking app
+    """
+    blocked_apps = ApplicationModel.select().where(ApplicationModel.is_blocked==1)
+    # print('blockeda apps',blocked_apps)
+
+    apps_info=[{'id':apps.id,'name':apps.name,'is_blocked':apps.is_blocked,'url':apps.url} for apps in list(blocked_apps)]
+    block_list=[key['name'] for key in apps_info]
+    if ap_name in block_list:
+        return True
+    else:
+        return False
+def blocked_url(url):
+    """
+    blocking url
+    """
+    blocked_apps = ApplicationModel.select().where(ApplicationModel.is_blocked == True)
+
+    # Fetch the results from the queryset and convert them to a list
+    blocked_apps_list = list(blocked_apps)
+
+    # Extract URLs from blocked apps and create a list of substrings
+    block_list_url = [app.url.strip().split('//')[1] for app in blocked_apps_list if app.url]
+    if url:
+        url = url.strip()  # Remove leading and trailing whitespace from the input URL
+        for blocked_url in block_list_url:
+            if blocked_url.lower() == url.lower():  # Perform case-insensitive comparison
+                return True
+
+    return False
 
 
+
+        
 class EventModel(BaseModel):
     id = AutoField()
     bucket = ForeignKeyField(BucketModel, backref="events", index=True)
@@ -234,9 +369,17 @@ class EventModel(BaseModel):
                     app_name = remove_more_page_suffix(titles[0])
             # logger.info("Title: %s, Application: %s", title_name, application_name)
 
-            ApplicationModel.from_application_details(
-                {"app_name": event.data.get('app', ''), "url": event.data.get('url', '')})
-            if application_name != '' and title_name != '':
+                # dct['id']=apps.id
+                # dct['type']=apps.type
+                # dct['name']=apps.name
+            #     dct['url']=apps.url
+            #     dct['alias']=apps.alias
+            #     dct['is_blocked']=apps.is_blocked
+            #     dct['is_ignore_idle_time']=apps.is_ignore_idle_time
+            ap_name=application_name.split('.')[0]
+            url_link=event.data.get('url')
+            # blocked=blocked_apps(ap_name,url_link)
+            if application_name != '' and title_name != '' and blocked_url(url_link) is not True:
                 try:
                     event_model = cls(
                         bucket=bucket_key,
@@ -262,7 +405,6 @@ class EventModel(BaseModel):
                     logger.warning("AttributeError: %s", str(ae))
                     return None
             else:
-                logger.warning("Application name or title is empty, returning None")
                 return None  # Return None if conditions are not met
         else:
             logger.warning("cls object is none")
@@ -387,105 +529,105 @@ def ensure_default_settings():
             print(f"Default setting already exists: {code} = {setting.value}")
 
 
-class ApplicationModel(BaseModel):
-    id = AutoField()
-    type = CharField()
-    name = CharField(null=True, unique=True)
-    url = CharField(null=True, unique=True)
-    alias = CharField(null=True)
-    is_blocked = BooleanField(default=0)
-    is_ignore_idle_time = BooleanField(default=0)
-    color = CharField(null=True)
-    created_at = DateTimeField(default=datetime.now())
-    updated_at = DateTimeField(default=datetime.now())
-    criteria = CharField(null=True)
+# class ApplicationModel(BaseModel):
+#     id = AutoField()
+#     type = CharField()
+#     name = CharField(null=True, unique=True)
+#     url = CharField(null=True, unique=True)
+#     alias = CharField(null=True)
+#     is_blocked = BooleanField(default=0)
+#     is_ignore_idle_time = BooleanField(default=0)
+#     color = CharField(null=True)
+#     created_at = DateTimeField(default=datetime.now())
+#     updated_at = DateTimeField(default=datetime.now())
+#     criteria = CharField(null=True)
 
-    @classmethod
-    def from_application_details(cls, application_details):
-        logger.info(f"Processing application details: {application_details}")
+#     @classmethod
+#     def from_application_details(cls, application_details):
+#         logger.info(f"Processing application details: {application_details}")
 
-        # Early return for AFK app_name
-        if application_details.get('app_name', '').lower() == 'afk':
-            logger.info("AFK event detected, returning None")
-            return None
+#         # Early return for AFK app_name
+#         if application_details.get('app_name', '').lower() == 'afk':
+#             logger.info("AFK event detected, returning None")
+#             return None
 
-        # Extract application details
-        app_url = application_details.get("url", None)
-        if app_url is not None:
-            app_url = app_url.strip()
+#         # Extract application details
+#         app_url = application_details.get("url", None)
+#         if app_url is not None:
+#             app_url = app_url.strip()
 
-        app_name = application_details.get("app_name", None)
-        if app_name is not None:
-            app_name = app_name.replace('.exe', '').strip()
+#         app_name = application_details.get("app_name", None)
+#         if app_name is not None:
+#             app_name = app_name.replace('.exe', '').strip()
 
-        try:
-            new_instance, created = cls.get_or_create(
-                type="web application" if app_url else "application",
-                name=app_name if not app_url else None,
-                url=app_url if app_url else None,
-                alias=application_details.get("alias", ""),
-                is_blocked=application_details.get("is_blocked", False),
-                is_ignore_idle_time=application_details.get("idle_time_ignored", False),
-                color=application_details.get("color", ""),
-                created_at=datetime.now(),
-                updated_at=datetime.now(),
-                criteria=application_details.get("criteria", "")
-            )
+#         try:
+#             new_instance, created = cls.get_or_create(
+#                 type="web application" if app_url else "application",
+#                 name=app_name if not app_url else None,
+#                 url=app_url if app_url else None,
+#                 alias=application_details.get("alias", ""),
+#                 is_blocked=application_details.get("is_blocked", False),
+#                 is_ignore_idle_time=application_details.get("idle_time_ignored", False),
+#                 color=application_details.get("color", ""),
+#                 created_at=datetime.now(),
+#                 updated_at=datetime.now(),
+#                 criteria=application_details.get("criteria", "")
+#             )
 
-            if created:
-                logger.info(f"New application created: {new_instance}")
-            else:
-                logger.info(f"Application already exists: {new_instance}")
+#             if created:
+#                 logger.info(f"New application created: {new_instance}")
+#             else:
+#                 logger.info(f"Application already exists: {new_instance}")
 
-            return new_instance
+#             return new_instance
 
-        except peewee.IntegrityError as e:
-            # logger.warning(f"Integrity error occurred: {e}")
-            # Here you handle the violation gracefully
-            # Check all fields for an existing record
-            existing_instance = cls.get_or_none(
-                type="web application" if app_url else "application",
-                name=app_name if not app_url else None,
-                url=app_url if app_url else None,
-                alias=application_details.get("alias", ""),
-                is_blocked=application_details.get("is_blocked", False),
-                is_ignore_idle_time=application_details.get("idle_time_ignored", False),
-                color=application_details.get("color", ""),
-                criteria=application_details.get("criteria", "")
-            )
-            if existing_instance:
-                logger.info(f"Updating existing application: {existing_instance}")
-                # Update the existing instance with new values
-                existing_instance.alias = application_details.get("alias", "")
-                existing_instance.is_blocked = application_details.get("is_blocked", False)
-                existing_instance.is_ignore_idle_time = application_details.get("idle_time_ignored", False)
-                existing_instance.color = application_details.get("color", "")
-                existing_instance.criteria = application_details.get("criteria", "")
-                existing_instance.save()
-                logger.info(f"Existing application updated: {existing_instance}")
-                return existing_instance
-            else:
-                logger.error("No existing application found to update")
-                # You can choose to raise the error or handle it differently based on your application's needs
+#         except peewee.IntegrityError as e:
+#             # logger.warning(f"Integrity error occurred: {e}")
+#             # Here you handle the violation gracefully
+#             # Check all fields for an existing record
+#             existing_instance = cls.get_or_none(
+#                 type="web application" if app_url else "application",
+#                 name=app_name if not app_url else None,
+#                 url=app_url if app_url else None,
+#                 alias=application_details.get("alias", ""),
+#                 is_blocked=application_details.get("is_blocked", False),
+#                 is_ignore_idle_time=application_details.get("idle_time_ignored", False),
+#                 color=application_details.get("color", ""),
+#                 criteria=application_details.get("criteria", "")
+#             )
+#             if existing_instance:
+#                 logger.info(f"Updating existing application: {existing_instance}")
+#                 # Update the existing instance with new values
+#                 existing_instance.alias = application_details.get("alias", "")
+#                 existing_instance.is_blocked = application_details.get("is_blocked", False)
+#                 existing_instance.is_ignore_idle_time = application_details.get("idle_time_ignored", False)
+#                 existing_instance.color = application_details.get("color", "")
+#                 existing_instance.criteria = application_details.get("criteria", "")
+#                 existing_instance.save()
+#                 logger.info(f"Existing application updated: {existing_instance}")
+#                 return existing_instance
+#             else:
+#                 logger.error("No existing application found to update")
+#                 # You can choose to raise the error or handle it differently based on your application's needs
 
-    def json(self):
-        """
-        Convert the model instance to a JSON-compatible dictionary.
-        :return: A dictionary representation of the settings.
-        """
-        return {
-            "id": self.id,
-            "type": self.type,
-            "name": self.name,
-            "url": self.url,
-            "alias": self.alias,
-            "is_blocked": self.is_blocked,
-            "is_ignore_idle_time": self.is_ignore_idle_time,
-            "color": self.color,
-            "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
-            "updated_at": self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
-            "criteria": self.criteria
-        }
+#     def json(self):
+#         """
+#         Convert the model instance to a JSON-compatible dictionary.
+#         :return: A dictionary representation of the settings.
+#         """
+#         return {
+#             "id": self.id,
+#             "type": self.type,
+#             "name": self.name,
+#             "url": self.url,
+#             "alias": self.alias,
+#             "is_blocked": self.is_blocked,
+#             "is_ignore_idle_time": self.is_ignore_idle_time,
+#             "color": self.color,
+#             "created_at": self.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
+#             "updated_at": self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
+#             "criteria": self.criteria
+#         }
 
 
 class PeeweeStorage(AbstractStorage):
@@ -741,7 +883,6 @@ class PeeweeStorage(AbstractStorage):
             raise Exception("Bucket did not exist, could not get metadata")
 
     def insert_one(self, bucket_id: str, event: Event) -> Event:
-        print(event)
         """
          Inserts a single event into the database. This is a convenience method for creating and persisting an : class : ` EventModel ` object from a bucket and event.
 
@@ -751,10 +892,12 @@ class PeeweeStorage(AbstractStorage):
          @return The newly inserted event. Note that you must call save () on the event before you call this
         """
         # e = EventModel.from_event(self.bucket_keys[bucket_id], event)
+        ap_name=event.data['app'].split('.')[0]
+        # url_link=event.data['url']
         if event.data['title'] != '' and event.data['app'] != '':
             e = EventModel.from_event(self.bucket_keys[bucket_id], event)
             is_exist = self._get_last_event_by_app_title_pulsetime(app=event.application_name, title=event.title)
-            if 'afk' not in event.application_name and is_exist:
+            if 'afk' not in event.application_name and is_exist and e:
                 # logger.info(f'event app: {event.application_name} title: {event.title}')
                 logger.info(f'befor app: {is_exist.id} {is_exist.application_name} title: {is_exist.title}')
                 is_exist.duration += Decimal(str(e.duration))
@@ -771,8 +914,8 @@ class PeeweeStorage(AbstractStorage):
                 e.save()
                 event.id = e.id
                 return event
-            else:
-                logger.warning("Event model has None")
+            # else:
+            #     logger.warning("Event model has None")
         else:
             logger.warning("None Type object has no server_sync_status attribut or Title were empty for this event")
             return event
