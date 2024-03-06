@@ -180,7 +180,7 @@ class BucketModel(BaseModel):
             "hostname": self.hostname,
             "data": json.loads(self.datastr) if self.datastr else {},
         }
-    
+
 class ApplicationModel(BaseModel):
     id = AutoField()
     type = CharField()
@@ -280,7 +280,7 @@ class ApplicationModel(BaseModel):
             "updated_at": self.updated_at.strftime('%Y-%m-%d %H:%M:%S'),  # Convert to a string in the desired format
             "criteria": self.criteria
         }
-    
+
 def blocked_apps(ap_name):
     """
     blocking app
@@ -315,7 +315,7 @@ def blocked_url(url):
 
 
 
-        
+
 class EventModel(BaseModel):
     id = AutoField()
     bucket = ForeignKeyField(BucketModel, backref="events", index=True)
@@ -376,10 +376,12 @@ class EventModel(BaseModel):
             #     dct['alias']=apps.alias
             #     dct['is_blocked']=apps.is_blocked
             #     dct['is_ignore_idle_time']=apps.is_ignore_idle_time
+            ApplicationModel.from_application_details(
+                {"app_name": event.data.get('app', ''), "url": event.data.get('url', '')})
             ap_name=application_name.split('.')[0]
             url_link=event.data.get('url')
             # blocked=blocked_apps(ap_name,url_link)
-            if application_name != '' and title_name != '' and blocked_url(url_link) is not True:
+            if application_name != '' and title_name != '':
                 try:
                     event_model = cls(
                         bucket=bucket_key,
