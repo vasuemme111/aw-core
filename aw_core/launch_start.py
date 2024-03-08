@@ -43,6 +43,7 @@ def delete_launch_app():
     # Check if the plist file exists before attempting to delete it
     if os.path.exists(plist_path):
         os.remove(plist_path)
+        os.system(f"launchctl load {plist_path}")
         print("Deleted plist file.")
     else:
         print("Plist file does not exist.")
