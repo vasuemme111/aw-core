@@ -90,6 +90,9 @@
 #         return {"status": "error", "message": "Shortcut not found"}
 
 
+
+
+
 import os
 import subprocess
 import plistlib
@@ -105,7 +108,6 @@ app_path = None
 if sys.platform == "win32":
     startup_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
     app_path = os.path.abspath("aw-qt.exe")
-
 
 def load_plist(plist_path):
     # Load and start the service using launchctl
@@ -172,3 +174,6 @@ def delete_shortcut():
         return {"status": "success", "message": "Shortcut deleted successfully"}
     else:
         return {"status": "error", "message": "Shortcut not found"}
+    
+
+
