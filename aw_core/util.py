@@ -10,7 +10,7 @@ from cryptography.fernet import Fernet
 import keyring
 import pam
 from aw_qt.manager import Manager
-
+import requests
 manager = Manager()
 
 logger = logging.getLogger(__name__)
@@ -259,8 +259,6 @@ def start_all_module():
     for module in modules:
         manager.start(module["watcher_name"])
 
-
-import requests
 
 
 def is_internet_connected():

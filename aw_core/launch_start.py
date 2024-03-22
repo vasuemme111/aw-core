@@ -13,12 +13,17 @@ if sys.platform == "win32":
     app_path = os.path.join(_module_dir, 'aw-qt.exe')
 
 
+def is_plist_in_launch_agents():
+    plist_filename = "com.ralvie.TTim.plist"
+    launch_agents_path = os.path.expanduser("~/Library/LaunchAgents")
+    plist_path = os.path.join(launch_agents_path, plist_filename)
+    return os.path.isfile(plist_path)
 
 # Mac
 def load_plist(plist_path):
     # Load and start the service using launchctl
     os.system(f"launchctl load {plist_path}")
-    os.system(f"launchctl start com.ralvie.TTim")
+
 def launch_app():
     plist_content = {
         'Label': 'com.ralvie.TTim',
@@ -34,7 +39,6 @@ def launch_app():
     # Write the plist content to the file
     with open(plist_path, 'wb') as plist_file:
         plistlib.dump(plist_content, plist_file)
-
     print(f"Created plist file: {plist_path}")
 
 def delete_launch_app():
@@ -42,6 +46,8 @@ def delete_launch_app():
 
     # Check if the plist file exists before attempting to delete it
     if os.path.exists(plist_path):
+        os.system(f"launchctl stop com.ralvie.TTim")
+        os.system(f"launchctl unload {plist_path}")
         os.remove(plist_path)
         os.system(f"launchctl load {plist_path}")
         print("Deleted plist file.")
@@ -53,7 +59,7 @@ def check_startup_status():
         bundle_identifier = "net.ralvie.TTim"
         command = f"launchctl list | grep {bundle_identifier}"
         result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        if result.returncode == 0:
+        if result.returncode == 0 or is_plist_in_launch_agents():
             print(f"The application with bundle identifier '{bundle_identifier}' starts on launch.")
             return True
         else:
