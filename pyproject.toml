@@ -38,12 +38,13 @@ pysqlcipher3 = [
     { version = "*", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" },
     { file = "pysqlcipher3-1.2.0-cp311-cp311-win_amd64.whl", markers = "sys_platform == 'win32'" }
 ]
-keyring="*"
 python-pam="*"
 sqlcipher3 = [
     { version = "*", markers = "sys_platform == 'linux' or sys_platform == 'darwin'" },
     { file = "sqlcipher3-0.5.2-cp311-cp311-win_amd64.whl", markers = "sys_platform == 'win32'" }
 ]
+keyrings-alt = "^5.0.0"
+keyring = "^25.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0"
@@ -54,6 +55,7 @@ black = "*"
 ruff = "*"
 pyupgrade = "*"
 TakeTheTime = "^0.3.1"
+
 
 [tool.ruff]
 ignore = ["E402", "E501"]
