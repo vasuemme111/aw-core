@@ -3,11 +3,9 @@ import subprocess
 import sys
 import plistlib
 if sys.platform == "win32":
-    import winshell
+    import winreg
 
 if sys.platform == "win32":
-    startup_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
-    shortcut_name = 'TTim.lnk'
     file_path = os.path.abspath(__file__)
     _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
     app_path = os.path.join(_module_dir, 'aw-qt.exe')
@@ -66,28 +64,45 @@ def check_startup_status():
             print(f"The application with bundle identifier '{bundle_identifier}' does not start on launch.")
             return False
     elif sys.platform == "win32":
-        shortcut = os.path.join(startup_path, shortcut_name)
-        if os.path.exists(shortcut):
-            return True, 200
-        else:
-            return False, 200
+            key_path = r'Software\Microsoft\Windows\CurrentVersion\Run'
+            with winreg.OpenKey(
+                    key=winreg.HKEY_CURRENT_USER,
+                    sub_key=key_path,
+                    reserved=0,
+                    access=winreg.KEY_READ,
+            ) as key:
+                try:
+                    value, _ = winreg.QueryValueEx(key, "TTim")
+                    return True
+                except FileNotFoundError:
+                    return False
     
 
 # Windows
 
-def create_shortcut():
-    print(app_path)
-    shortcut = os.path.join(startup_path, shortcut_name)
-    with winshell.shortcut(shortcut) as link:
-        link.path = app_path
-        link.description = "Shortcut for YourApp"
-    return {"status": "success", "message": "Shortcut created successfully"}
+def set_autostart_registry(autostart: bool = True) -> bool:
+    """
+    Create/update/delete Windows autostart registry key
+
+    :param app_name:    A string containing the name of the application
+    :param app_path:    A string specifying the application path
+    :param autostart:   True - create/update autostart key / False - delete autostart key
+    :return:            True - Success / False - Error, app name doesn't exist
+    """
+    key_path = r'Software\Microsoft\Windows\CurrentVersion\Run'
+    with winreg.OpenKey(
+            key=winreg.HKEY_CURRENT_USER,
+            sub_key=key_path,
+            reserved=0,
+            access=winreg.KEY_ALL_ACCESS,
+    ) as key:
+        try:
+            if autostart:
+                winreg.SetValueEx(key, "TTim", 0, winreg.REG_SZ, app_path)
+            else:
+                winreg.DeleteValue(key, "TTim")
+        except OSError:
+            return False
+    return True
 
 
-def delete_shortcut():
-    shortcut = os.path.join(startup_path, shortcut_name)
-    if os.path.exists(shortcut):
-        os.remove(shortcut)
-        return {"status": "success", "message": "Shortcut deleted successfully"}
-    else:
-        return {"status": "error", "message": "Shortcut not found"}

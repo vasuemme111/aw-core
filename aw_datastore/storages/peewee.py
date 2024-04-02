@@ -20,7 +20,7 @@ from playhouse.shortcuts import model_to_dict
 
 from aw_core.cache import cache_user_credentials
 from aw_core import db_cache
-from aw_core.launch_start import create_shortcut, launch_app, check_startup_status
+from aw_core.launch_start import set_autostart_registry, launch_app, check_startup_status
 from aw_qt.manager import Manager
 
 if sys.platform == "win32":
@@ -614,7 +614,6 @@ class PeeweeStorage(AbstractStorage):
                 if filepath != os.path.join(data_dir, filename):
                     database_changed = True
             _db = SqlCipherDatabase(None, passphrase=password)
-            print("passowrd",password)
             db_proxy.initialize(_db)
             self.db = _db
             self.db.init(filepath)
@@ -644,7 +643,7 @@ class PeeweeStorage(AbstractStorage):
             setup_weekday_settings()
             db_cache.store(application_cache_key, self.retrieve_application_names())
             db_cache.store(settings_cache_key, self.retrieve_all_settings())
-            self.save_settings("launch", check_startup_status())
+            check_startup_status()
             # Stop all modules that have been changed.
             if database_changed:
                 stop_all_module()
@@ -1513,8 +1512,8 @@ class PeeweeStorage(AbstractStorage):
         # (evaluates to True), and if it is, it calls the function launch_app().
         if settings['launch'] and sys.platform == "darwin" and not check_startup_status() :
             launch_app()
-        elif settings['launch'] and sys.platform == "win32" and not check_startup_status() :
-            create_shortcut()
+        elif settings['launch'] and sys.platform == "win32" and not check_startup_status():
+            set_autostart_registry(autostart=True)
 
     def afk_status(self):
         manager = Manager()
