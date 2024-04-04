@@ -20,7 +20,7 @@ from playhouse.shortcuts import model_to_dict
 
 from aw_core.cache import cache_user_credentials
 from aw_core import db_cache
-from aw_core.launch_start import set_autostart_registry, launch_app, check_startup_status
+from aw_core.launch_start import launch_app, check_startup_status
 from aw_qt.manager import Manager
 
 if sys.platform == "win32":
@@ -211,6 +211,7 @@ class ApplicationModel(BaseModel):
         app_name = application_details.get("app_name", None)
         if app_name is not None:
             app_name = app_name.replace('.exe', '').strip()
+            app_name = app_name.capitalize()
 
         try:
             new_instance, created = cls.get_or_create(
