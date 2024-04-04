@@ -2,107 +2,67 @@ import os
 import subprocess
 import sys
 import plistlib
-if sys.platform == "win32":
-    import winreg
 
 if sys.platform == "win32":
+    import winshell
+
+if sys.platform == "win32":
+    startup_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup')
+    shortcut_name = 'TTim.lnk'
     file_path = os.path.abspath(__file__)
     _module_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
     app_path = os.path.join(_module_dir, 'aw-qt.exe')
+if sys.platform == "darwin":
+    app_path = "/Applications/TTim.app"
+    app_name = "TTim"
 
-
-def is_plist_in_launch_agents():
-    plist_filename = "com.ralvie.TTim.plist"
-    launch_agents_path = os.path.expanduser("~/Library/LaunchAgents")
-    plist_path = os.path.join(launch_agents_path, plist_filename)
-    return os.path.isfile(plist_path)
-
-# Mac
-def load_plist(plist_path):
-    # Load and start the service using launchctl
-    os.system(f"launchctl load {plist_path}")
 
 def launch_app():
-    plist_content = {
-        'Label': 'com.ralvie.TTim',
-        'ProgramArguments': ['/Applications/TTim.app/Contents/MacOS/aw-qt'],
-        'RunAtLoad': True,
-        # Add other keys and values as needed
-    }
+    cmd = f"osascript -e 'tell application \"System Events\" to make login item at end with properties {{path:\"{app_path}\", hidden:false}}'"
+    subprocess.run(cmd, shell=True)
 
-    # Define the path to the LaunchAgents directory and the plist file
-    launchagents_dir = os.path.expanduser('~/Library/LaunchAgents')
-    plist_path = os.path.join(launchagents_dir, 'com.ralvie.TTim.plist')
-
-    # Write the plist content to the file
-    with open(plist_path, 'wb') as plist_file:
-        plistlib.dump(plist_content, plist_file)
-    print(f"Created plist file: {plist_path}")
 
 def delete_launch_app():
-    plist_path = os.path.expanduser('~/Library/LaunchAgents/com.ralvie.TTim.plist')
+    cmd = f"osascript -e 'tell application \"System Events\" to delete login item \"{app_name}\"'"
+    subprocess.run(cmd, shell=True)
 
-    # Check if the plist file exists before attempting to delete it
-    if os.path.exists(plist_path):
-        os.system(f"launchctl stop com.ralvie.TTim")
-        os.system(f"launchctl unload {plist_path}")
-        os.remove(plist_path)
-        os.system(f"launchctl load {plist_path}")
-        print("Deleted plist file.")
-    else:
-        print("Plist file does not exist.")
+
+def get_login_items():
+    data = []
+    cmd = "osascript -e 'tell application \"System Events\" to get the name of every login item'"
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    data = result.stdout.strip().split(", ")
+    if "TTim" in data:
+        return True
+    return False
+
 
 def check_startup_status():
     if sys.platform == "darwin":
-        bundle_identifier = "net.ralvie.TTim"
-        command = f"launchctl list | grep {bundle_identifier}"
-        result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        if result.returncode == 0 or is_plist_in_launch_agents():
-            print(f"The application with bundle identifier '{bundle_identifier}' starts on launch.")
-            return True
-        else:
-            print(f"The application with bundle identifier '{bundle_identifier}' does not start on launch.")
-            return False
+        return get_login_items()
     elif sys.platform == "win32":
-            key_path = r'Software\Microsoft\Windows\CurrentVersion\Run'
-            with winreg.OpenKey(
-                    key=winreg.HKEY_CURRENT_USER,
-                    sub_key=key_path,
-                    reserved=0,
-                    access=winreg.KEY_READ,
-            ) as key:
-                try:
-                    value, _ = winreg.QueryValueEx(key, "TTim")
-                    return True
-                except FileNotFoundError:
-                    return False
-    
+        shortcut = os.path.join(startup_path, shortcut_name)
+        if os.path.exists(shortcut):
+            return True, 200
+        else:
+            return False, 200
+
 
 # Windows
 
-def set_autostart_registry(autostart: bool = True) -> bool:
-    """
-    Create/update/delete Windows autostart registry key
-
-    :param app_name:    A string containing the name of the application
-    :param app_path:    A string specifying the application path
-    :param autostart:   True - create/update autostart key / False - delete autostart key
-    :return:            True - Success / False - Error, app name doesn't exist
-    """
-    key_path = r'Software\Microsoft\Windows\CurrentVersion\Run'
-    with winreg.OpenKey(
-            key=winreg.HKEY_CURRENT_USER,
-            sub_key=key_path,
-            reserved=0,
-            access=winreg.KEY_ALL_ACCESS,
-    ) as key:
-        try:
-            if autostart:
-                winreg.SetValueEx(key, "TTim", 0, winreg.REG_SZ, app_path)
-            else:
-                winreg.DeleteValue(key, "TTim")
-        except OSError:
-            return False
-    return True
+def create_shortcut():
+    print(app_path)
+    shortcut = os.path.join(startup_path, shortcut_name)
+    with winshell.shortcut(shortcut) as link:
+        link.path = app_path
+        link.description = "Shortcut for YourApp"
+    return {"status": "success", "message": "Shortcut created successfully"}
 
 
+def delete_shortcut():
+    shortcut = os.path.join(startup_path, shortcut_name)
+    if os.path.exists(shortcut):
+        os.remove(shortcut)
+        return {"status": "success", "message": "Shortcut deleted successfully"}
+    else:
+        return {"status": "error", "message": "Shortcut not found"}
